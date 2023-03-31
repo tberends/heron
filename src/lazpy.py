@@ -12,9 +12,9 @@ from shapely.strtree import STRtree
 import matplotlib.pyplot as plt
 
 # read las file
-# las = laspy.read("data/X127500Y502000.laz")  # small size
-las = laspy.read("data/X125500Y499500.laz")  # medium size
-# las = laspy.read("data/X125500Y500000.laz") # large size
+# las = laspy.read("data/raw/X127500Y502000.laz")  # small size
+las = laspy.read("data/raw/X125500Y499500.laz")  # medium size
+# las = laspy.read("data/raw/X125500Y500000.laz") # large size
 print(las)
 
 print(las.header)
@@ -37,7 +37,7 @@ geom.points = o3d.utility.Vector3dVector(point_data)
 o3d.visualization.draw_geometries([geom])
 
 # open waterdelen geojson file and with encoding utf-8
-with open("extract/bgt_waterdeel.geojson", encoding="utf-8") as f:
+with open("data/external/bgt_waterdeel.geojson", encoding="utf-8") as f:
     js = json.load(f)
 
 # create a polygon objects from the geojson file
@@ -47,7 +47,7 @@ for i in range(len(js["features"])):
 # print(waterbodies)
 
 # open peilgebieden geojson file and with encoding utf-8
-with open("extract/peilgebieden_purmer.geojson", encoding="utf-8") as f:
+with open("data/external/peilgebieden_purmer.geojson", encoding="utf-8") as f:
     js = json.load(f)
 
 peilgebieden = []
@@ -103,10 +103,10 @@ waterbodies2 = waterbodies2.buffer(0)
 # print(df_las.head())
 
 # # write the dataframe to a csv file
-# df_las.to_csv("df_las.csv", index=False)
+# df_las.to_csv("data/processed/df_las.csv", index=False)
 
 # read csf file as dataframe
-df_las = pd.read_csv("df_las.csv")
+df_las = pd.read_csv("data/processed/df_las.csv")
 
 # make a fequency table of the las.Z values per peilgebied and las.classification
 df_las["node_id"] = df_las["node_id"].astype(int)
@@ -151,17 +151,18 @@ df_merge.rename(columns={"Z_right": "Z_std"}, inplace=True)
 # remove columns with suffix _right
 df_merge = df_merge.loc[:, ~df_merge.columns.str.endswith("_right")]
 print(df_merge.head())
-df_merge.to_csv("df_merge.csv")
+df_merge.to_csv("data/processed/df_merge.csv")
 
 # plot the frequency table
 df_las_freq.plot(kind="bar", stacked=True)
+plt.savefig("reports/figures/barplot.png")
 
 # create a new las file with only the points within the polygon and write it to disk
 water = laspy.create(
     point_format=las.header.point_format, file_version=las.header.version
 )
 water.points = las.points[df_las["node_id"].values]
-water.write("water.las")
+water.write("data/processed/water.las")
 
 point_data = np.stack([water.X, water.Y, water.Z], axis=0).transpose((1, 0))
 geom = o3d.geometry.PointCloud()
@@ -176,11 +177,13 @@ for waterbody in waterbodies:
 ax.plot(las.X / 1000, las.Y / 1000, "ro")
 ax.plot(water.X / 1000, water.Y / 1000, color="yellow")
 ax.set_aspect("equal")
-plt.show()
+# write plot to disk in folder reports/figures
+plt.savefig("reports/figures/map_laspoint.png")
+# plt.show()
 
 # buildings = laspy.create(
 #     point_format=las.header.point_format, file_version=las.header.version
 # )
 # buildings.points = las.points[las.classification == 6]
 
-# buildings.write("buildings.las")
+# buildings.write("data/processed/buildings.las")
