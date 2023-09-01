@@ -180,10 +180,3 @@ ax.set_aspect("equal")
 # write plot to disk in folder reports/figures
 plt.savefig("reports/figures/map_laspoint.png")
 # plt.show()
-
-# buildings = laspy.create(
-#     point_format=las.header.point_format, file_version=las.header.version
-# )
-# buildings.points = las.points[las.classification == 6]
-
-# buildings.write("data/processed/buildings.las")
