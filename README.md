@@ -24,8 +24,9 @@ Define which filter functions will be applies to the point cloud
 Execution of defines functions
 
 ### step 4: write outpout to file(s)
-Processed file is written to a .csv file in data/processed
-if create_tif = True a tif is created and stored in data/tifs
+Processed file is written to a .csv file in data/processed.
+
+if create_tif = True a tif is created and stored in data/tifs.
 
 
 
