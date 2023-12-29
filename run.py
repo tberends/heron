@@ -16,12 +16,10 @@ import os
 import numpy as np
 import pandas as pd
 import laspy
-from shapely.geometry import shape, Point, MultiPolygon, Polygon, box, MultiPoint
 import geopandas as gpd
 from src.filter_within_geometries import filter_within_geometries
 from src.laz_tot_tif import laz_to_tif
 from src.filter_functions import *
-import rioxarray as rxr
 import contextily as ctx
 import matplotlib.pyplot as plt
 
@@ -46,8 +44,8 @@ points = gpd.GeoDataFrame(
 )
 print("Total points: ", len(lasX))
 
-# load shapefiles geometries
-waterdelen = gpd.read_file("data/external/bgt_waterdeel.shp")
+# load geometries
+waterdelen = gpd.read_file("data/external/bgt_waterdeel.gml")
 
 # User can add more parts so they can join with additional information from polygon to points
 waterdelen = gpd.GeoDataFrame(waterdelen["geometry"], geometry=waterdelen["geometry"])
@@ -65,11 +63,9 @@ filter_geometries = (
 filter_minmax = False  # option for filtering between mean and mad value
 min_peil = -1  # lower Z value for which points are filtered out
 max_peil = 1  # upper Z value for which points are filtered out
-filter_hartlijn = False  # filter around hartlijn of e.g. waterbody (to decrease for isntance the effect of vegetation)
-dist_hartlijn = 2  # size of buffer from hartlijn (m)
-tif_averaging_mode = (
-    "median"  # option for chosing value used for tif mean, mode, median
-)
+filter_centerline = False  # filter around centerline of e.g. waterbody (to decrease for isntance the effect of vegetation)
+dist_centerline = 2  # size of buffer from centerline (m)
+tif_averaging_mode = "mode"  # option for chosing value used for tif mean, mode, median
 create_tif = True  # average the values based on option above and create a 1x1m grid
 output_file_name = []  # list of options set to true used to adjust name of output file
 
@@ -89,10 +85,10 @@ if filter_minmax == True:
     output_file_name.append("minmax")
 
 
-if filter_hartlijn == True:
-    hartlijn = gpd.read_file("data/external/hartlijn_test.shp")
-    output_file_name.append("hartlijn")
-    print("points are filtered around a distance of " + str(dist_hartlijn) + "m")
+if filter_centerline == True:
+    centerline = gpd.read_file("data/external/centerline_test.shp")
+    output_file_name.append("centerline")
+    print("points are filtered around a distance of " + str(dist_centerline) + "m")
 
 
 if create_tif == True:
@@ -108,7 +104,7 @@ For every functions a abbreviation is added.
 """
 
 out_name_full = "_".join(output_file_name)
-WRITE_DIR = r"data/output/"  # back to /processed
+WRITE_DIR = r"data/processed"
 WRITE_NAME = LAS_NAME + "_" + out_name_full + ".csv"
 WRITE_PATH = os.path.join(WRITE_DIR, WRITE_NAME)
 points.to_csv(WRITE_PATH, index=False)
@@ -116,10 +112,16 @@ points.to_csv(WRITE_PATH, index=False)
 if create_tif == True:
     fig, ax = plt.subplots(figsize=(10, 10))
     ctx.add_basemap(ax, crs=raster_points.rio.crs, source=ctx.providers.CartoDB.Voyager)
+    waterdelen.plot(ax=ax, facecolor="lightgrey", alpha=0.3, edgecolor="blue")
     raster_points.plot(ax=ax, cmap="terrain")
-    waterdelen.plot(ax=ax, facecolor="none", edgecolor="blue")
+    # save figure
+    FIG_DIR = r"data/output/"
+    FIG_NAME = LAS_NAME + "_" + out_name_full + ".png"
+    FIG_PATH = os.path.join(FIG_DIR, FIG_NAME)
+    plt.savefig(FIG_PATH)
+    plt.show()
 
-    TIF_DIR = r"data/tifs/"
+    TIF_DIR = r"data/output/"
     TIF_NAME = LAS_NAME + "_" + out_name_full + ".tif"
     TIF_PATH = os.path.join(TIF_DIR, TIF_NAME)
     raster_points.rio.to_raster(TIF_PATH, recalc_transform=False)
