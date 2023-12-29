@@ -61,6 +61,8 @@ Choose which filter options the user wants to use for processing the .las files
 
 filter_geometries = True        # option to filter .las points within shapefiles (e.g. waterdelen)
 filter_minmax = False           # option for filtering between mean and mad value
+min_peil = -1                   # lower Z value for which points are filtered out 
+max_peil = 1                    # upper Z value for which points are filtered out
 filter_hartlijn = False         # filter around hartlijn of e.g. waterbody (to decrease for isntance the effect of vegetation)
 dist_hartlijn = 2               # size of buffer from hartlijn (m)
 tif_averaging_mode = 'median'   # option for chosing value used for tif mean, mode, median
@@ -68,17 +70,19 @@ create_tif =  True              # average the values based on option above and c
 output_file_name = []           # list of options set to true used to adjust name of output file
 
 
+
 """
 Step 3: execute functions
 """
 if filter_geometries == True:
     points = filter_within_geometries(points, waterdelen)
-    print('files are filtered')
+    print('files are filtered within geometries')
     output_file_name.append('fwg')
 
 
 if filter_minmax == True:
-    print( 'points are filtered within a predefined minimum and maximum mNAP')
+    points = filter_minmax(points, min_peil , max_peil)
+    print( 'points are filtered between a predefined minimum and maximum mNAP')
     output_file_name.append('minmax')
 
 

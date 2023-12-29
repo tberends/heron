@@ -1,7 +1,34 @@
 hhnk-drone-inspection
 ==============================
+Inspection of waterlevels using LiDAR images from drones.
 
-Inspection of waterlevels using LiDAR images from drones
+The scripts processes a .las/.laz file. Several functions filtering the .las/.laz can be called
+to acquire the desired output of the file. If a function is used it adds an abbrevation
+describing the function actions.
+
+### Step 1
+load .las/laz file
+- copy .las/.laz file to data/raw
+- define name las file
+- define extension (.las/.laz)
+- define coördinate reference system
+
+load in geometries
+- define geometries in data/exterma;
+
+### Step 2 choose filter option
+Define which filter functions will be applies to the point cloud
+
+
+### Step 3: execute functions
+Execution of defines functions
+
+### step 4: write outpout to file(s)
+Processed file is written to a .csv file in data/processed.
+
+if create_tif = True a tif is created and stored in data/tifs.
+
+
 
 Project Organization
 ------------
@@ -11,17 +38,11 @@ Project Organization
     ├── README.md          <- The top-level README for developers using this project.
     ├── data
     │   ├── external       <- Data from third party sources.
-    │   ├── interim        <- Intermediate data that has been transformed.
+    │   ├── tifs	       <- Intermediate data that has been transformed.
     │   ├── processed      <- The final, canonical data sets for modeling.
     │   └── raw            <- The original, immutable data dump.
     │
     ├── docs               <- A default Sphinx project; see sphinx-doc.org for details
-    │
-    ├── models             <- Trained and serialized models, model predictions, or model summaries
-    │
-    ├── notebooks          <- Jupyter notebooks. Naming convention is a number (for ordering),
-    │                         the creator's initials, and a short `-` delimited description, e.g.
-    │                         `1.0-jqp-initial-data-exploration`.
     │
     ├── references         <- Data dictionaries, manuals, and all other explanatory materials.
     │
@@ -42,14 +63,8 @@ Project Organization
     │   │   └── build_features.py
     │   │
     │   ├── models         <- Scripts to train models and then use trained models to make
-    │   │   │                 predictions
-    │   │   ├── predict_model.py
-    │   │   └── train_model.py
     │   │
-    │   └── visualization  <- Scripts to create exploratory and results oriented visualizations
-    │       └── visualize.py
-    │
-    └── tox.ini            <- tox file with settings for running tox; see tox.readthedocs.io
+
 
 
 --------
