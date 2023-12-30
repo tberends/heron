@@ -1,33 +1,50 @@
-hhnk-drone-inspection
-==============================
+# hhnk-drone-inspection
 
 ![banner](docs/images/banner.jpg)
 
+This project, funded by Digishape Seed Money, focuses on the inspection of water levels using LiDAR images from drones. It includes scripts that process .las/.laz files. You can apply several filtering functions to the .las/.laz files to get the desired output. Each function used adds an abbreviation that describes the function's actions.
 
-Inspection of waterlevels using LiDAR images from drones.
+## How to Use
 
-The scripts processes a .las/.laz file. Several functions filtering the .las/.laz can be called
-to acquire the desired output of the file. If a function is used it adds an abbrevation
-describing the function actions.
+### Step 1: Load .las/.laz file and geometries
+- Move your .las/.laz file to the `data/raw` directory.
+- Specify the name of the .las file.
+- Specify the file extension (.las/.laz).
+- Define the coordinate reference system.
+- Define geometries in the `data/external` directory.
 
-### Step 1
-load .las/laz file
-- copy .las/.laz file to data/raw
-- define name las file
-- define extension (.las/.laz)
-- define coördinate reference system
+### Step 2: Choose filter options
+Select the filter functions that you want to apply to the point cloud.
 
-load in geometries
-- define geometries in data/exterma;
+### Step 3: Execute functions
+Run the defined functions.
 
-### Step 2 choose filter option
-Define which filter functions will be applies to the point cloud
+### Step 4: Write output to file(s)
+The processed file is saved as a .csv file in the `data/processed` directory. If `create_tif` is set to `True`, a .tif file is created and stored in the `data/output` directory.
 
+## Installation
 
-### Step 3: execute functions
-Execution of defines functions
+Before you start using this project, you need to ensure that you have the necessary software installed and the project set up on your local machine. Follow the steps below:
 
-### step 4: write outpout to file(s)
-Processed file is written to a .csv file in data/processed.
+### Prerequisites
 
-if create_tif = True a tif is created and stored in data/tifs.
+- Python 3.10 or later
+- pip (Python package installer)
+
+### Steps
+
+1. Clone the repository to your local machine:
+
+```bash
+git clone https://github.com/tberends/hhnk-drone-inspection.git
+```
+
+2. Navigate to the project directory:
+
+cd hhnk-drone-inspection
+
+3. Install the required Python packages:
+
+pip install -r requirements.txt
+
+Now, you're ready to use the project. Refer to the "How to Use" section for further instructions.
