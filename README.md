@@ -20,7 +20,7 @@ Select the filter functions that you want to apply to the point cloud.
 Run the defined functions.
 
 ### Step 4: Write output to file(s)
-The processed file is saved as a .csv file in the `data/processed` directory. If `create_tif` is set to `True`, a .tif file is created and stored in the `data/output` directory.
+Figures and maps will be written to the directory `data/output`. If `create_tif` is set to `True`, a .tif file is created and stored in the same directory.
 
 ## Installation
 
