@@ -2,7 +2,6 @@
 This module provides functionality to filter points within geometries.
 """
 
-from typing import Any
 import geopandas as gpd
 
 

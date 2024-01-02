@@ -38,12 +38,13 @@ Before you start using this project, you need to ensure that you have the necess
 ```bash
 git clone https://github.com/tberends/hhnk-drone-inspection.git
 ```
+
 2. Navigate to the project directory:
-```bash
+
 cd hhnk-drone-inspection
-```
+
 3. Install the required Python packages:
-```bash
+
 pip install -r requirements.txt
-```
+
 Now, you're ready to use the project. Refer to the "How to Use" section for further instructions.
