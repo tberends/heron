@@ -1,6 +1,6 @@
 # Heron
 
-![banner](docs/images/banner.jpg)
+![banner](docs/images/heron.png)
 
 This project, funded by Digishape Seed Money, focuses on the inspection of water levels using LiDAR images from drones. It includes scripts that process .las/.laz files. You can apply several filtering functions to the .las/.laz files to get the desired output. Each function used adds an abbreviation that describes the function's actions.
 
