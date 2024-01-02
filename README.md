@@ -1,4 +1,4 @@
-# hhnk-drone-inspection
+# Heron
 
 ![banner](docs/images/banner.jpg)
 
