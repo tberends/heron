@@ -36,15 +36,16 @@ Before you start using this project, you need to ensure that you have the necess
 1. Clone the repository to your local machine:
 
 ```bash
-git clone https://github.com/tberends/hhnk-drone-inspection.git
+git clone https://github.com/tberends/heron.git
 ```
-
 2. Navigate to the project directory:
 
-cd hhnk-drone-inspection
-
+```bash
+cd heron
+```
 3. Install the required Python packages:
 
+```bash
 pip install -r requirements.txt
-
+```
 Now, you're ready to use the project. Refer to the "How to Use" section for further instructions.
