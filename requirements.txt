@@ -3,7 +3,7 @@ numpy==1.26.0
 pandas==2.0.3
 geopandas==0.14.1
 laspy==2.4.1
-laszrs==0.5.2
+lazrs==0.5.2
 xarray==2023.9.0
 rioxarray==0.15.0
 contextily==1.4.0
