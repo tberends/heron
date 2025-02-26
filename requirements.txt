@@ -1,7 +1,7 @@
 # This file may be used to create an environment using:
 numpy==1.26.0
 pandas==2.0.3
-geopandas==0.14.1
+geopandas==1.0.1
 fiona==1.9.1 
 laspy==2.4.1
 lazrs==0.5.2

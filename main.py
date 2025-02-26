@@ -21,7 +21,9 @@ import geopandas as gpd
 import laspy
 import contextily as ctx
 import matplotlib.pyplot as plt
+from pyproj import Transformer
 
+from src.get_waterdelen import get_waterdelen
 from src.filter_spatial import filter_spatial
 from src.generate_raster import generate_raster
 from src.filter_functions import filter_by_z_value, filter_by_proximity_to_centerline
@@ -42,29 +44,57 @@ def load_data(las_name, data_dir=r"data/raw/", in_extension=".laz", crs="EPSG:28
     Returns:
         tuple: A tuple containing the points dataframe, the waterdelen dataframe, and the lasX array.
     """
-    las_loc = las_name + in_extension
-    laz_file = os.path.join(data_dir, las_loc)
+    # Bouw het pad correct op
+    las_file = las_name + in_extension
+    laz_file = os.path.join(data_dir, las_file)
+    
+    # Controleer of het bestand bestaat
+    if not os.path.exists(laz_file):
+        raise FileNotFoundError(f"Het bestand '{laz_file}' bestaat niet. Controleer of het pad correct is.")
+    
     las = laspy.read(laz_file)
 
-    las_x = np.array(las.X / 1000)
-    las_y = np.array(las.Y / 1000)
-    las_z = np.array(las.Z / 1000)
+    # Print important header parameters in a readable format
+    print("\nLAS Header Information:")
+    print(f"Version: {las.header.version}")
+    print(f"Point Format: {las.header.point_format}")
+    print(f"Number of points: {las.header.point_count}")
+    print(f"Bounds: \n  min: {las.header.mins}\n  max: {las.header.maxs}")
+    print(f"Scale factors: {las.header.scales}")
+
+    # Convert the las file to a geopandas dataframe using the scale factors and offset from header
+    las_x = np.array(las.X * las.header.scales[0] + las.header.offsets[0])
+    las_y = np.array(las.Y * las.header.scales[1] + las.header.offsets[1]) 
+    las_z = np.array(las.Z * las.header.scales[2] + las.header.offsets[2])
 
     # additional data can be added to the dataframe here
     data_coord = pd.DataFrame({"X": las_x, "Y": las_y, "Z": las_z})
 
+    # Load points data
     points = gpd.GeoDataFrame(
         data_coord, geometry=gpd.points_from_xy(data_coord.X, data_coord.Y), crs=crs
     )
-    print("Total points: ", len(las_x))
 
-    # load geometries
-    waterdelen = gpd.read_file("data/external/bgt_waterdeel.gml")
-
-    # User can add more parts so they can join with additional information from polygon to points
-    waterdelen = gpd.GeoDataFrame(
-        waterdelen["geometry"], geometry=waterdelen["geometry"], crs=crs
+    # Calculate bounding box from points with some buffer
+    bounds = points.total_bounds
+    bbox_buffer = 100  # 100 meter buffer
+    bbox = (
+        bounds[0] - bbox_buffer,
+        bounds[1] - bbox_buffer,
+        bounds[2] + bbox_buffer,
+        bounds[3] + bbox_buffer
     )
+    # Transform the bounding box to EPSG:28992 for PDOK API
+    transformer = Transformer.from_crs(crs, "EPSG:28992", always_xy=True)
+    bbox = transformer.transform_bounds(*bbox)
+
+    # Get waterdelen for the area
+    waterdelen = get_waterdelen(bbox)
+    if waterdelen is None:
+        print("Geen waterdelen gevonden via PDOK API")
+        waterdelen = gpd.GeoDataFrame(
+            columns=["geometry"], crs=crs
+        )
 
     return points, waterdelen, las_x
 
@@ -173,6 +203,7 @@ def save_tif(raster_points, las_name, out_name_full):
 
 def main(
     las_name: str = "X126000Y500000",
+    in_extension: str = ".laz",
     filter_geometries: bool = False,
     filter_minmax: bool = False,
     min_peil: int = -1,
@@ -190,6 +221,7 @@ def main(
 
     Args:
         las_name (str, optional): The name of the .las file. Defaults to "X126000Y500000".
+        in_extension (str, optional): The extension of the .las file. Defaults to ".laz".
         filter_geometries (bool, optional): Whether to filter geometries. Defaults to False.
         filter_minmax (bool, optional): Whether to filter minmax. Defaults to False.
         min_peil (int, optional): The minimum peil. Defaults to -1.
@@ -202,7 +234,7 @@ def main(
         frequencydiagram (bool, optional): Whether to plot the frequency. Defaults to False.
         coordinates (tuple, optional): The coordinates in RD to plot the frequency. Defaults to (126012.5, 500481).
     """
-    points, waterdelen, las_x = load_data(las_name)
+    points, waterdelen, las_x = load_data(las_name, in_extension=in_extension)
 
     points, output_file_name = apply_filters(
         points,
@@ -234,3 +266,5 @@ def main(
 
 if __name__ == "__main__":
     main(filter_geometries=True, frequencydiagram=True)
+    main(las_name="clouda404dd152634b782_Block_0", in_extension=".las",filter_geometries=True)
+    main(las_name="126000_505000", in_extension=".las",filter_geometries=True)
