@@ -45,7 +45,7 @@ def plot_frequency(points: gpd.GeoDataFrame, coordinates: tuple, las_name: str) 
     print("Most common Z-value: ", points_in_buffer["Z"].mode()[0])
 
     # plot frequency diagram with Z values on y-axis and number of points on x-axis
-    plt.rcParams["font.family"] = "Calibri"
+    plt.rcParams["font.family"] = "Helvetica"
     plt.hist(
         points_in_buffer["Z"],
         bins=100,
