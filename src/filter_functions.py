@@ -2,8 +2,16 @@
 This module provides functionality to filter points based on Z value and proximity to a centerline.
 """
 
+import logging
 from typing import Any
 import geopandas as gpd
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
 def filter_by_z_value(
@@ -46,5 +54,5 @@ def filter_by_proximity_to_centerline(
         points = points.drop(columns=["index_right"])
 
     points_near_centerline = gpd.sjoin(points, centerline_buffered, predicate="within")
-    print("Filtered points around a centerline")
+    logger.info("Filtered points around a centerline")
     return points_near_centerline

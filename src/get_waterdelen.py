@@ -6,6 +6,9 @@ from zipfile import ZipFile
 from io import BytesIO
 import geopandas as gpd
 from typing import Tuple, Optional
+import logging
+
+logger = logging.getLogger(__name__)
 
 def get_waterdelen(bbox: Tuple[float, float, float, float], crs: str = "EPSG:28992") -> Optional[gpd.GeoDataFrame]:
     """
@@ -59,7 +62,7 @@ def get_waterdelen(bbox: Tuple[float, float, float, float], crs: str = "EPSG:289
             elif status['status'] == 'FAILED':
                 raise Exception("BGT download failed")
                 
-            print(f"Download progress: {status.get('progress', '...')}%")
+            logger.info(f"Download progress: {status.get('progress', '...')}%")
             time.sleep(1)
         
         # Download and process ZIP
@@ -75,6 +78,6 @@ def get_waterdelen(bbox: Tuple[float, float, float, float], crs: str = "EPSG:289
         return gdf
 
     except Exception as e:
-        print(f"Error downloading waterdelen: {str(e)}")
+        logger.error(f"Error downloading waterdelen: {str(e)}")
         return None
 

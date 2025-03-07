@@ -1,8 +1,16 @@
+import logging
 import numpy as np
 import geopandas as gpd
 from xarray import DataArray
 import rioxarray as rxr
 from typing import Union
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
 def generate_tif(points: gpd.GeoDataFrame, tif_averaging_mode: str) -> DataArray:
@@ -51,7 +59,7 @@ def generate_tif(points: gpd.GeoDataFrame, tif_averaging_mode: str) -> DataArray
 
     # Set the spatial dimensions
     da.rio.set_spatial_dims(x_dim="X", y_dim="Y", inplace=True)
-    print("Resolution is", da.rio.resolution())
+    logger.info(f"Resolution is {da.rio.resolution()}")
 
     # Set the CRS
     da.rio.write_crs("EPSG:28992", inplace=True)

@@ -1,7 +1,15 @@
+import logging
 import numpy as np
 import geopandas as gpd
 from xarray import DataArray
 import rioxarray as rxr
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
 def generate_raster(points: gpd.GeoDataFrame, raster_averaging_mode: str) -> DataArray:
@@ -50,7 +58,7 @@ def generate_raster(points: gpd.GeoDataFrame, raster_averaging_mode: str) -> Dat
 
     # Set the spatial dimensions
     da.rio.set_spatial_dims(x_dim="X", y_dim="Y", inplace=True)
-    print("Resolution is", da.rio.resolution())
+    logger.info(f"Resolution is {da.rio.resolution()}")
 
     # Set the CRS
     da.rio.write_crs("EPSG:28992", inplace=True)

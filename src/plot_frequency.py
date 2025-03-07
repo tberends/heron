@@ -1,9 +1,17 @@
 # -*- coding: utf-8 -*-
 
+import logging
 import geopandas as gpd
 from shapely.geometry import Point
 import matplotlib.pyplot as plt
 import contextily as ctx
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 
 def plot_frequency(points: gpd.GeoDataFrame, coordinates: tuple, las_name: str) -> None:
@@ -37,12 +45,12 @@ def plot_frequency(points: gpd.GeoDataFrame, coordinates: tuple, las_name: str) 
     points_in_buffer = gpd.sjoin(points, point_buffer_gdf, predicate="within")
 
     if len(points_in_buffer) == 0:
-        print("No points found in buffer for frequency diagram")
+        logger.info("No points found in buffer for frequency diagram")
         return
 
     # Print info
-    print("Number of points in buffer: ", len(points_in_buffer))
-    print("Most common Z-value: ", points_in_buffer["Z"].mode()[0])
+    logger.info(f"Number of points in buffer: {len(points_in_buffer)}")
+    logger.info(f"Most common Z-value: {points_in_buffer['Z'].mode()[0]}")
 
     # plot frequency diagram with Z values on y-axis and number of points on x-axis
     plt.rcParams["font.family"] = "Helvetica"
