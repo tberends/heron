@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import os
 import logging
 import geopandas as gpd
 from shapely.geometry import Point
@@ -64,3 +65,40 @@ def plot_frequency(points: gpd.GeoDataFrame, coordinates: tuple, las_name: str) 
     plt.xlabel("Number of points")
     plt.title(f"Most common Z-value: {round(points_in_buffer['Z'].mode()[0], 2)} mNAP")
     plt.savefig(f"data/output/{las_name}_frequencydiagram.png")
+
+
+def plot_map(raster_points, points, waterdelen, lasfile, out_name_full):
+    """
+    Creates a plot of the raster points and saves it as a .png file.
+
+    Args:
+        raster_points (GeoDataFrame): The raster points to plot.
+        points (GeoDataFrame): The lidar points left after filtering.
+        waterdelen (GeoDataFrame): The water bodies dataframe.
+        lasfile (str): The name of the .las file.
+        out_name_full (str): The full name of the output file.
+    """
+    # Check if raster_points is not None
+    if raster_points is None:
+        logger.info("No raster points to plot")
+        return
+    fig, ax = plt.subplots(figsize=(10, 10))
+    waterdelen.plot(ax=ax, facecolor="lightgrey", alpha=0.3, edgecolor="blue")
+    raster_points.plot(ax=ax, cmap="viridis")
+    ctx.add_basemap(ax, crs=raster_points.rio.crs, source=ctx.providers.CartoDB.Voyager)
+    ax.set_title(
+        "File: "
+        + lasfile
+        + "\n"
+        + "Number of lidar points: "
+        + str(len(points))
+        + "\n"
+        + "Filter options: "
+        + out_name_full,
+    )
+
+    FIG_DIR = r"data/output/"
+    FIG_NAME = lasfile + "_" + out_name_full + ".png"
+    FIG_PATH = os.path.join(FIG_DIR, FIG_NAME)
+    plt.savefig(FIG_PATH)
+    logger.info(f"Plot saved to: {FIG_PATH}")

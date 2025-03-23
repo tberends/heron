@@ -24,12 +24,14 @@ import laspy
 import contextily as ctx
 import matplotlib.pyplot as plt
 from pyproj import Transformer
-from src.filter_spatial import filter_spatial
+
+from src.import_data import load_data
+from src.filter_spatial import filter_spatial, calculate_centerline
 from src.generate_raster import generate_raster
 from src.filter_functions import filter_by_z_value, filter_by_proximity_to_centerline
-from src.plot_frequency import plot_frequency
+from src.create_plots import plot_frequency, plot_map
 from src.get_waterdelen import get_waterdelen
-from src.merge_tif import merge_tif_files
+
 
 # Configure logging
 def setup_logging():
@@ -76,102 +78,6 @@ def setup_logging():
     return logger
 
 logger = setup_logging()
-
-
-def load_data(lasfile, data_dir=r"data/raw/", crs="EPSG:28992"):
-    """
-    Loads the .las files and converts them to a geopandas dataframe.
-    Also loads the geometries used for filtering the .las files.
-
-    Args:
-        lasfile (str): The complete filename of the .las/.laz file to load.
-        data_dir (str, optional): The directory where the .las file is located. Defaults to "data/raw/".
-        crs (str, optional): The coordinate reference system to use. Defaults to "EPSG:28992".
-
-    Returns:
-        tuple: A tuple containing the points dataframe, the water bodies dataframe, and the lasX array.
-    """
-    laz_file = os.path.join(data_dir, lasfile)
-    las = laspy.read(laz_file)
-
-    # Log important header parameters
-    logger.info("LAS Header Information:")
-    logger.info(f"Version: {las.header.version}")
-    logger.info(f"Point Format: {las.header.point_format}")
-    logger.info(f"Number of points: {las.header.point_count}")
-    logger.info(f"Bounds:  min: {las.header.mins}  max: {las.header.maxs}")
-    logger.info(f"Scale factors: {las.header.scales}")
-
-    # Convert the las file to a geopandas dataframe using the scale factors and offset from header
-    las_x = np.array(las.X * las.header.scales[0] + las.header.offsets[0])
-    las_y = np.array(las.Y * las.header.scales[1] + las.header.offsets[1]) 
-    las_z = np.array(las.Z * las.header.scales[2] + las.header.offsets[2])
-
-    # Additional data can be added to the dataframe here
-    data_coord = pd.DataFrame({"X": las_x, "Y": las_y, "Z": las_z})
-
-    # Load points data
-    points = gpd.GeoDataFrame(
-        data_coord, geometry=gpd.points_from_xy(data_coord.X, data_coord.Y), crs=crs
-    )
-
-    # Calculate bounding box from points with some buffer
-    bounds = points.total_bounds
-    bbox_buffer = 100  # 100 meter buffer
-    bbox = (
-        bounds[0] - bbox_buffer,
-        bounds[1] - bbox_buffer,
-        bounds[2] + bbox_buffer,
-        bounds[3] + bbox_buffer
-    )
-    # Transform the bounding box to EPSG:28992 for PDOK API
-    transformer = Transformer.from_crs(crs, "EPSG:28992", always_xy=True)
-    bbox = transformer.transform_bounds(*bbox)
-
-    # Get waterdelen for the area
-    waterdelen = get_waterdelen(bbox)
-    if waterdelen is None:
-        logger.warning("No water bodies found via PDOK API")
-        waterdelen = gpd.GeoDataFrame(
-            columns=["geometry"], crs=crs
-        )
-
-    return points, waterdelen, las_x
-
-
-def calculate_centerline(waterdelen: gpd.GeoDataFrame, buffer_distance: float = 1.0) -> Optional[gpd.GeoDataFrame]:
-    """
-    Calculates the centerline of water bodies by applying a negative buffer to the water polygons.
-
-    Args:
-        waterdelen (gpd.GeoDataFrame): GeoDataFrame containing water body polygons
-        buffer_distance (float, optional): Distance for the negative buffer in meters. Defaults to 1.0.
-
-    Returns:
-        Optional[gpd.GeoDataFrame]: GeoDataFrame containing the centerlines, or None if no valid centerlines can be calculated
-    """
-    if waterdelen.empty:
-        logger.warning("No water bodies found to calculate centerline from")
-        return None
-    
-    try:
-        # Apply negative buffer to get centerline
-        centerlines = waterdelen.copy()
-        centerlines['geometry'] = centerlines['geometry'].buffer(-buffer_distance)
-        
-        # Remove empty geometries
-        centerlines = centerlines[~centerlines['geometry'].is_empty]
-        
-        if centerlines.empty:
-            logger.warning("No valid centerlines could be calculated from the water bodies, try a smaller negative buffer distance")
-            return None
-            
-        logger.info(f"Successfully calculated centerlines from {len(waterdelen)} water bodies")
-        return centerlines
-        
-    except Exception as e:
-        logger.error(f"Error calculating centerlines: {str(e)}")
-        return None
 
 
 def apply_filters(
@@ -223,44 +129,6 @@ def apply_filters(
 
     logger.info(f"Number of points after filtering: {len(points)}")
     return points, output_file_name
-
-
-def create_plot(raster_points, points, waterdelen, lasfile, out_name_full):
-    """
-    Creates a plot of the raster points and saves it as a .png file.
-
-    Args:
-        raster_points (GeoDataFrame): The raster points to plot.
-        points (GeoDataFrame): The lidar points left after filtering.
-        waterdelen (GeoDataFrame): The water bodies dataframe.
-        lasfile (str): The name of the .las file.
-        out_name_full (str): The full name of the output file.
-    """
-    # Check if raster_points is not None
-    if raster_points is None:
-        logger.info("No raster points to plot")
-        return
-    fig, ax = plt.subplots(figsize=(10, 10))
-    waterdelen.plot(ax=ax, facecolor="lightgrey", alpha=0.3, edgecolor="blue")
-    raster_points.plot(ax=ax, cmap="viridis")
-    ctx.add_basemap(ax, crs=raster_points.rio.crs, source=ctx.providers.CartoDB.Voyager)
-    ax.set_title(
-        "File: "
-        + lasfile
-        + "\n"
-        + "Number of lidar points: "
-        + str(len(points))
-        + "\n"
-        + "Filter options: "
-        + out_name_full,
-    )
-
-    FIG_DIR = r"data/output/"
-    FIG_NAME = lasfile + "_" + out_name_full + ".png"
-    FIG_PATH = os.path.join(FIG_DIR, FIG_NAME)
-    plt.savefig(FIG_PATH)
-    logger.info(f"Plot saved to: {FIG_PATH}")
-    # plt.show()
 
 
 def save_tif(raster_points, lasfile, out_name_full):
@@ -376,7 +244,7 @@ def process_single_file(
         out_name_full = "_".join(output_file_name)
         
         # Individual file processing
-        create_plot(raster_points, points, waterdelen, os.path.splitext(lasfile)[0], out_name_full)
+        plot_map(raster_points, points, waterdelen, os.path.splitext(lasfile)[0], out_name_full)
         if create_tif:
             save_tif(raster_points, os.path.splitext(lasfile)[0], out_name_full)
 
@@ -464,7 +332,7 @@ def main(
         # Create combined plot and TIF
         out_name_full = ""
         if combined_raster_points is not None:
-            create_plot(
+            plot_map(
                 combined_raster_points,
                 combined_points,
                 combined_waterdelen,
@@ -483,4 +351,4 @@ def main(
 
 
 if __name__ == "__main__":
-    main(filter_geometries=True, frequencydiagram=False, filter_centerline=True)
+    main(filter_geometries=True, frequencydiagram=False, buffer_distance=1, filter_centerline=True)
