@@ -345,6 +345,9 @@ def process_single_file(
         output_file_name (List[str], optional): The name of the output file. Defaults to [].
         frequencydiagram (bool, optional): Whether to plot the frequency. Defaults to False.
         coordinates (tuple, optional): The coordinates in RD to plot the frequency. Defaults to (126012.5, 500481).
+    
+    Returns:
+        dict: A dictionary containing the processed data, or None if an error occurred
     """
     try:
         logger.info(f"Starting processing of file: {lasfile}")
@@ -371,6 +374,8 @@ def process_single_file(
             logger.info(f"Points are averaged based on their {raster_averaging_mode} value")
 
         out_name_full = "_".join(output_file_name)
+        
+        # Individual file processing
         create_plot(raster_points, points, waterdelen, os.path.splitext(lasfile)[0], out_name_full)
         if create_tif:
             save_tif(raster_points, os.path.splitext(lasfile)[0], out_name_full)
@@ -378,8 +383,15 @@ def process_single_file(
         output_file_name = []
         logger.info(f"Finished processing file: {lasfile}")
         
+        # Return the processed data
+        return {
+            'points': points,
+            'waterdelen': waterdelen,
+        }
+        
     except Exception as e:
         logger.error(f"Error processing file {lasfile}: {str(e)}")
+        return None
 
 
 def main(
@@ -418,9 +430,10 @@ def main(
         logger.error("No files to process. Exiting.")
         return
     
-    # Process each file
+    # Process each file and collect results
+    all_results = []
     for lasfile in las_files:
-        process_single_file(
+        result = process_single_file(
             lasfile,
             filter_geometries,
             filter_minmax,
@@ -430,18 +443,43 @@ def main(
             buffer_distance,
             raster_averaging_mode,
             create_tif,
-            output_file_name.copy(),  # Create a copy to avoid sharing the same list
+            output_file_name.copy(),
             frequencydiagram,
             coordinates,
         )
+        if result:
+            all_results.append(result)
+    
+    # Create combined outputs
+    if all_results:
+        combined_points = pd.concat([r['points'] for r in all_results])
+        combined_waterdelen = pd.concat([r['waterdelen'] for r in all_results]).drop_duplicates()
+        
+        # Generate raster for combined points
+        combined_raster_points = None
+        if create_tif and combined_points.shape[0] > 0:
+            combined_raster_points = generate_raster(combined_points, raster_averaging_mode)
+            logger.info(f"Combined points are averaged based on their {raster_averaging_mode} value")
+        
+        # Create combined plot and TIF
+        out_name_full = ""
+        if combined_raster_points is not None:
+            create_plot(
+                combined_raster_points,
+                combined_points,
+                combined_waterdelen,
+                "combined_results",
+                out_name_full
+            )
+            
+            if create_tif:
+                save_tif(
+                    combined_raster_points,
+                    "combined_results",
+                    out_name_full
+                )
     
     logger.info("Finished processing all files")
-    
-    # Merge all .tif files
-    try:
-        merge_tif_files()
-    except ValueError as e:
-        logger.error(str(e))
 
 
 if __name__ == "__main__":
