@@ -29,6 +29,7 @@ from src.generate_raster import generate_raster
 from src.filter_functions import filter_by_z_value, filter_by_proximity_to_centerline
 from src.plot_frequency import plot_frequency
 from src.get_waterdelen import get_waterdelen
+from src.merge_tif import merge_tif_files
 
 # Configure logging
 def setup_logging():
@@ -162,7 +163,7 @@ def calculate_centerline(waterdelen: gpd.GeoDataFrame, buffer_distance: float = 
         centerlines = centerlines[~centerlines['geometry'].is_empty]
         
         if centerlines.empty:
-            logger.warning("No valid centerlines could be calculated from the water bodies")
+            logger.warning("No valid centerlines could be calculated from the water bodies, try a smaller negative buffer distance")
             return None
             
         logger.info(f"Successfully calculated centerlines from {len(waterdelen)} water bodies")
@@ -181,7 +182,7 @@ def apply_filters(
     min_peil,
     max_peil,
     filter_centerline,
-    dist_centerline,
+    buffer_distance,
     output_file_name,
 ):
     """
@@ -195,7 +196,7 @@ def apply_filters(
         min_peil (int): The minimum water level.
         max_peil (int): The maximum water level.
         filter_centerline (bool): Whether to filter the centerline.
-        dist_centerline (int): The distance of the centerline.
+        buffer_distance (float): The buffer distance for centerline filtering.
         output_file_name (List[str]): The name of the output file.
 
     Returns:
@@ -212,10 +213,10 @@ def apply_filters(
         output_file_name.append("minmax")
 
     if filter_centerline:
-        centerline = calculate_centerline(waterdelen)
+        centerline = calculate_centerline(waterdelen, buffer_distance)
         if centerline is not None:
-            points = filter_by_proximity_to_centerline(points, centerline, dist_centerline)
-            logger.info(f"Points are filtered around a distance of {dist_centerline}m from the calculated centerline")
+            points = filter_by_proximity_to_centerline(points, centerline)
+            logger.info(f"Points zijn gefilterd rond de centerline.")
             output_file_name.append("centerline")
         else:
             logger.warning("Skipping centerline filtering as no valid centerline could be calculated")
@@ -224,15 +225,15 @@ def apply_filters(
     return points, output_file_name
 
 
-def create_plot(raster_points, waterdelen, lasfile, lasX, out_name_full):
+def create_plot(raster_points, points, waterdelen, lasfile, out_name_full):
     """
     Creates a plot of the raster points and saves it as a .png file.
 
     Args:
         raster_points (GeoDataFrame): The raster points to plot.
+        points (GeoDataFrame): The lidar points left after filtering.
         waterdelen (GeoDataFrame): The water bodies dataframe.
         lasfile (str): The name of the .las file.
-        lasX (array): The lasX array.
         out_name_full (str): The full name of the output file.
     """
     # Check if raster_points is not None
@@ -248,7 +249,7 @@ def create_plot(raster_points, waterdelen, lasfile, lasX, out_name_full):
         + lasfile
         + "\n"
         + "Number of lidar points: "
-        + str(len(lasX))
+        + str(len(points))
         + "\n"
         + "Filter options: "
         + out_name_full,
@@ -321,7 +322,7 @@ def process_single_file(
     min_peil: int = -1,
     max_peil: int = 1,
     filter_centerline: bool = False,
-    dist_centerline: int = 2,
+    buffer_distance: float = 1.0,
     raster_averaging_mode: str = "mode",
     create_tif: bool = True,
     output_file_name: List[str] = [],
@@ -338,7 +339,7 @@ def process_single_file(
         min_peil (int, optional): The minimum water level. Defaults to -1.
         max_peil (int, optional): The maximum water level. Defaults to 1.
         filter_centerline (bool, optional): Whether to filter the centerline. Defaults to False.
-        dist_centerline (int, optional): The distance of the centerline. Defaults to 2.
+        buffer_distance (float, optional): The buffer distance for centerline filtering. Defaults to 1.0.
         raster_averaging_mode (str, optional): The raster averaging mode. Defaults to "mode", can also be "mean" or "median".
         create_tif (bool, optional): Whether to create a .tif file. Defaults to True.
         output_file_name (List[str], optional): The name of the output file. Defaults to [].
@@ -357,7 +358,7 @@ def process_single_file(
             min_peil,
             max_peil,
             filter_centerline,
-            dist_centerline,
+            buffer_distance,
             output_file_name,
         )
 
@@ -370,7 +371,7 @@ def process_single_file(
             logger.info(f"Points are averaged based on their {raster_averaging_mode} value")
 
         out_name_full = "_".join(output_file_name)
-        create_plot(raster_points, waterdelen, os.path.splitext(lasfile)[0], las_x, out_name_full)
+        create_plot(raster_points, points, waterdelen, os.path.splitext(lasfile)[0], out_name_full)
         if create_tif:
             save_tif(raster_points, os.path.splitext(lasfile)[0], out_name_full)
 
@@ -387,7 +388,7 @@ def main(
     min_peil: int = -1,
     max_peil: int = 1,
     filter_centerline: bool = False,
-    dist_centerline: int = 2,
+    buffer_distance: float = 1.0,
     raster_averaging_mode: str = "mode",
     create_tif: bool = True,
     output_file_name: List[str] = [],
@@ -403,7 +404,7 @@ def main(
         min_peil (int, optional): The minimum water level. Defaults to -1.
         max_peil (int, optional): The maximum water level. Defaults to 1.
         filter_centerline (bool, optional): Whether to filter the centerline. Defaults to False.
-        dist_centerline (int, optional): The distance of the centerline. Defaults to 2.
+        buffer_distance (float, optional): The buffer distance for centerline filtering. Defaults to 1.0.
         raster_averaging_mode (str, optional): The raster averaging mode. Defaults to "mode", can also be "mean" or "median".
         create_tif (bool, optional): Whether to create a .tif file. Defaults to True.
         output_file_name (List[str], optional): The name of the output file. Defaults to [].
@@ -426,7 +427,7 @@ def main(
             min_peil,
             max_peil,
             filter_centerline,
-            dist_centerline,
+            buffer_distance,
             raster_averaging_mode,
             create_tif,
             output_file_name.copy(),  # Create a copy to avoid sharing the same list
@@ -435,6 +436,12 @@ def main(
         )
     
     logger.info("Finished processing all files")
+    
+    # Merge all .tif files
+    try:
+        merge_tif_files()
+    except ValueError as e:
+        logger.error(str(e))
 
 
 if __name__ == "__main__":

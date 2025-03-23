@@ -33,7 +33,7 @@ def filter_by_z_value(
 
 
 def filter_by_proximity_to_centerline(
-    points: gpd.GeoDataFrame, centerline: gpd.GeoDataFrame, buffer_size: float
+    points: gpd.GeoDataFrame, centerline: gpd.GeoDataFrame
 ) -> gpd.GeoDataFrame:
     """
     Filters points that are within a certain distance of a centerline.
@@ -41,18 +41,15 @@ def filter_by_proximity_to_centerline(
     Parameters:
     points (gpd.GeoDataFrame): A GeoDataFrame containing the points to be filtered.
     centerline (gpd.GeoDataFrame): A GeoDataFrame containing the centerline.
-    buffer_size (float): The distance from the centerline within which to filter points.
 
     Returns:
     gpd.GeoDataFrame: A GeoDataFrame containing only the points that are within buffer_size of the centerline.
     """
-    centerline_buffered = centerline["geometry"].buffer(buffer_size, cap_style="flat")
-    centerline_buffered = gpd.GeoDataFrame(geometry=centerline_buffered)
 
     if "index_right" in points.columns:
         # Drop the 'index_right' column
         points = points.drop(columns=["index_right"])
 
-    points_near_centerline = gpd.sjoin(points, centerline_buffered, predicate="within")
+    points_near_centerline = gpd.sjoin(points, centerline, predicate="within")
     logger.info("Filtered points around a centerline")
     return points_near_centerline
