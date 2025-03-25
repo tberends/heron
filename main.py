@@ -25,6 +25,7 @@ import contextily as ctx
 import matplotlib.pyplot as plt
 from pyproj import Transformer
 
+from src.chunk_files import split_las_file
 from src.import_data import load_data
 from src.filter_spatial import filter_spatial, calculate_centerline
 from src.generate_raster import generate_raster
@@ -160,7 +161,7 @@ def find_las_files(data_dir: str = "data/raw/") -> List[str]:
         List[str]: List of complete filenames including extension
     """
     las_files = []
-    for ext in ['.las', '.laz']:
+    for ext in ['.las', '.laz', '.LAS', '.LAZ']:
         for file in os.listdir(data_dir):
             if file.endswith(ext):
                 las_files.append(file)
@@ -219,7 +220,7 @@ def process_single_file(
     """
     try:
         logger.info(f"Starting processing of file: {lasfile}")
-        points, waterdelen, las_x = load_data(lasfile)
+        points, waterdelen, las_x = load_data(lasfile, data_dir="data/processed/")
 
         points, output_file_name = apply_filters(
             points,
@@ -291,6 +292,11 @@ def main(
         frequencydiagram (bool, optional): Whether to plot the frequency. Defaults to False.
         coordinates (tuple, optional): The coordinates in RD to plot the frequency. Defaults to (126012.5, 500481).
     """
+
+    # Clear processed data directory and output directory
+    [os.remove(os.path.join("data/processed/", f)) for f in os.listdir("data/processed/") if f.endswith(".las")]
+    [os.remove(os.path.join("data/output/", f)) for f in os.listdir("data/output/") if f.endswith(".png") or f.endswith(".tif")]
+
     # Find all LAS/LAZ files to process
     las_files = find_las_files()
     
@@ -298,9 +304,20 @@ def main(
         logger.error("No files to process. Exiting.")
         return
     
+    # Chunk files if needed in size of 1000x1000 and 1 million points per iteration
+    for lasfile in las_files:
+        logger.info(f"Splitting file: {lasfile}")
+        lasfile = os.path.join("data/raw/", lasfile)
+        split_las_file(lasfile, "data/processed/", (1000, 1000), 10**6)
+
+    processed_files = find_las_files("data/processed/")
+    if not processed_files:
+        logger.error("No files to process. Exiting.")
+        return
+    
     # Process each file and collect results
     all_results = []
-    for lasfile in las_files:
+    for lasfile in processed_files:
         result = process_single_file(
             lasfile,
             filter_geometries,

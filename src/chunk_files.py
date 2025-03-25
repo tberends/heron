@@ -125,7 +125,8 @@ def split_las_file(
 
                     if np.any(mask):
                         if writers[i] is None:
-                            output_path = Path(output_dir) / f"output_{i}.laz"
+                            # Make output file path based on input file and inputfile extension
+                            output_path = Path(output_dir) / f"{Path(input_file).stem}_{round(x_min)}_{round(y_max)}.las"
                             writers[i] = laspy.open(
                                 output_path, mode="w", header=file.header
                             )
