@@ -27,7 +27,7 @@ from pyproj import Transformer
 
 from src.chunk_files import split_las_file
 from src.import_data import load_data
-from src.filter_spatial import filter_spatial, calculate_centerline
+from src.filter_spatial import filter_spatial, calculate_centerline, calculate_polygon_statistics
 from src.generate_raster import generate_raster
 from src.filter_functions import filter_by_z_value, filter_by_proximity_to_centerline
 from src.create_plots import plot_frequency, plot_map
@@ -196,6 +196,8 @@ def main(
     output_file_name: List[str] = [],
     frequencydiagram: bool = False,
     coordinates: tuple = (126012.5, 500481),
+    polygon_file: Optional[str] = None,
+    polygon_statistic: str = "mean",
 ):
     """
     The main function that processes all LAS/LAZ files in the data/raw directory.
@@ -212,11 +214,13 @@ def main(
         output_file_name (List[str], optional): The name of the output file. Defaults to [].
         frequencydiagram (bool, optional): Whether to plot the frequency. Defaults to False.
         coordinates (tuple, optional): The coordinates in RD to plot the frequency. Defaults to (126012.5, 500481).
+        polygon_file (Optional[str], optional): Path to the .gdb or .gpkg file containing polygons. Defaults to None.
+        polygon_statistic (str, optional): Type of statistic to calculate ("mean" or "median"). Defaults to "mean".
     """
 
     # Clear processed data directory and output directory
     [os.remove(os.path.join("data/processed/", f)) for f in os.listdir("data/processed/") if f.endswith(".las")]
-    [os.remove(os.path.join("data/output/", f)) for f in os.listdir("data/output/") if f.endswith(".png") or f.endswith(".tif")]
+    [os.remove(os.path.join("data/output/", f)) for f in os.listdir("data/output/") if f.endswith(".png") or f.endswith(".tif") or f.endswith(".gpkg")]
 
     # Find all LAS/LAZ files to process
     las_files = find_las_files()
@@ -265,7 +269,6 @@ def main(
 
             out_name_full = "_".join(output_file_name)
             
-            # Individual file processing
             plot_map(raster_points, points, waterdelen, os.path.splitext(lasfile)[0], out_name_full)
             if create_tif:
                 save_tif(raster_points, os.path.splitext(lasfile)[0], out_name_full)
@@ -273,7 +276,6 @@ def main(
             output_file_name = []
             logger.info(f"Finished processing file: {lasfile}")
             
-            # Add the processed data to results
             all_results.append({
                 'points': points,
                 'waterdelen': waterdelen,
@@ -313,9 +315,34 @@ def main(
                     output_file_name,
                     out_name_full
                 )
+
+            # Calculate statistics per polygon if a polygon file is provided
+            if polygon_file and combined_raster_points is not None:
+                try:
+                    polygon_stats = calculate_polygon_statistics(
+                        combined_raster_points,
+                        polygon_file,
+                        polygon_statistic
+                    )
+                    
+                    # Save results as GeoPackage
+                    output_stats = f"data/output/{output_file_name}_polygon_stats.gpkg"
+                    polygon_stats.to_file(output_stats, driver="GPKG")
+                    logger.info(f"Polygon statistics saved to: {output_stats}")
+                    
+                except Exception as e:
+                    logger.error(f"Error calculating polygon statistics: {str(e)}")
+            
     
     logger.info("Finished processing all files")
 
 
 if __name__ == "__main__":
-    main(filter_geometries=True, frequencydiagram=False, buffer_distance=1, filter_centerline=True)
+    main(
+        filter_geometries=True,
+        frequencydiagram=False,
+        buffer_distance=1,
+        filter_centerline=True,
+        polygon_file="data/external/peilafwijking.gdb",  # Example usage
+        polygon_statistic="mean"
+    )
