@@ -184,85 +184,6 @@ def find_las_files(data_dir: str = "data/raw/") -> List[str]:
     return unique_files
 
 
-def process_single_file(
-    lasfile: str,
-    filter_geometries: bool = False,
-    filter_minmax: bool = False,
-    min_peil: int = -1,
-    max_peil: int = 1,
-    filter_centerline: bool = False,
-    buffer_distance: float = 1.0,
-    raster_averaging_mode: str = "mode",
-    create_tif: bool = True,
-    output_file_name: List[str] = [],
-    frequencydiagram: bool = False,
-    coordinates: tuple = (126012.5, 500481),
-):
-    """
-    Processes a single LAS/LAZ file.
-
-    Args:
-        lasfile (str): The complete filename of the .las/.laz file to process.
-        filter_geometries (bool, optional): Whether to filter geometries. Defaults to False.
-        filter_minmax (bool, optional): Whether to filter minmax. Defaults to False.
-        min_peil (int, optional): The minimum water level. Defaults to -1.
-        max_peil (int, optional): The maximum water level. Defaults to 1.
-        filter_centerline (bool, optional): Whether to filter the centerline. Defaults to False.
-        buffer_distance (float, optional): The buffer distance for centerline filtering. Defaults to 1.0.
-        raster_averaging_mode (str, optional): The raster averaging mode. Defaults to "mode", can also be "mean" or "median".
-        create_tif (bool, optional): Whether to create a .tif file. Defaults to True.
-        output_file_name (List[str], optional): The name of the output file. Defaults to [].
-        frequencydiagram (bool, optional): Whether to plot the frequency. Defaults to False.
-        coordinates (tuple, optional): The coordinates in RD to plot the frequency. Defaults to (126012.5, 500481).
-    
-    Returns:
-        dict: A dictionary containing the processed data, or None if an error occurred
-    """
-    try:
-        logger.info(f"Starting processing of file: {lasfile}")
-        points, waterdelen, las_x = load_data(lasfile, data_dir="data/processed/")
-
-        points, output_file_name = apply_filters(
-            points,
-            waterdelen,
-            filter_geometries,
-            filter_minmax,
-            min_peil,
-            max_peil,
-            filter_centerline,
-            buffer_distance,
-            output_file_name,
-        )
-
-        if frequencydiagram:
-            plot_frequency(points, coordinates, os.path.splitext(lasfile)[0])
-
-        raster_points = None
-        if create_tif and points.shape[0] > 0:
-            raster_points = generate_raster(points, raster_averaging_mode)
-            logger.info(f"Points are averaged based on their {raster_averaging_mode} value")
-
-        out_name_full = "_".join(output_file_name)
-        
-        # Individual file processing
-        plot_map(raster_points, points, waterdelen, os.path.splitext(lasfile)[0], out_name_full)
-        if create_tif:
-            save_tif(raster_points, os.path.splitext(lasfile)[0], out_name_full)
-
-        output_file_name = []
-        logger.info(f"Finished processing file: {lasfile}")
-        
-        # Return the processed data
-        return {
-            'points': points,
-            'waterdelen': waterdelen,
-        }
-        
-    except Exception as e:
-        logger.error(f"Error processing file {lasfile}: {str(e)}")
-        return None
-
-
 def main(
     filter_geometries: bool = False,
     filter_minmax: bool = False,
@@ -318,27 +239,56 @@ def main(
     # Process each file and collect results
     all_results = []
     for lasfile in processed_files:
-        result = process_single_file(
-            lasfile,
-            filter_geometries,
-            filter_minmax,
-            min_peil,
-            max_peil,
-            filter_centerline,
-            buffer_distance,
-            raster_averaging_mode,
-            create_tif,
-            output_file_name.copy(),
-            frequencydiagram,
-            coordinates,
-        )
-        if result:
-            all_results.append(result)
+        try:
+            logger.info(f"Starting processing of file: {lasfile}")
+            points, waterdelen, las_x = load_data(lasfile, data_dir="data/processed/")
+
+            points, output_file_name = apply_filters(
+                points,
+                waterdelen,
+                filter_geometries,
+                filter_minmax,
+                min_peil,
+                max_peil,
+                filter_centerline,
+                buffer_distance,
+                output_file_name,
+            )
+
+            if frequencydiagram:
+                plot_frequency(points, coordinates, os.path.splitext(lasfile)[0])
+
+            raster_points = None
+            if create_tif and points.shape[0] > 0:
+                raster_points = generate_raster(points, raster_averaging_mode)
+                logger.info(f"Points are averaged based on their {raster_averaging_mode} value")
+
+            out_name_full = "_".join(output_file_name)
+            
+            # Individual file processing
+            plot_map(raster_points, points, waterdelen, os.path.splitext(lasfile)[0], out_name_full)
+            if create_tif:
+                save_tif(raster_points, os.path.splitext(lasfile)[0], out_name_full)
+
+            output_file_name = []
+            logger.info(f"Finished processing file: {lasfile}")
+            
+            # Add the processed data to results
+            all_results.append({
+                'points': points,
+                'waterdelen': waterdelen,
+                'filters': output_file_name,
+            })
+            
+        except Exception as e:
+            logger.error(f"Error processing file {lasfile}: {str(e)}")
+            continue
     
     # Create combined outputs
     if all_results:
         combined_points = pd.concat([r['points'] for r in all_results])
         combined_waterdelen = pd.concat([r['waterdelen'] for r in all_results]).drop_duplicates()
+        output_file_name = 'combined_results_' + '_'.join(all_results[0]['filters'])
         
         # Generate raster for combined points
         combined_raster_points = None
@@ -353,14 +303,14 @@ def main(
                 combined_raster_points,
                 combined_points,
                 combined_waterdelen,
-                "combined_results",
+                output_file_name,
                 out_name_full
             )
             
             if create_tif:
                 save_tif(
                     combined_raster_points,
-                    "combined_results",
+                    output_file_name,
                     out_name_full
                 )
     
