@@ -1,5 +1,11 @@
 ![banner](docs/images/heron.jpg)
 
+[![Python](https://img.shields.io/badge/Python-3.9%2B-blue)](https://www.python.org/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+[![Last Commit](https://img.shields.io/github/last-commit/TU-Delft-ICT/heron)](https://github.com/tberends/heron/commits/main)
+[![Issues](https://img.shields.io/github/issues/tberends/heron)](https://github.com/tberends/heron/issues)
+[![Status](https://img.shields.io/badge/Status-Active-success)](https://github.com/tberends/heron)
+
 # Heron
 
 Dit project, gefinancierd door Digishape Seed Money, richt zich op het inspecteren van waterpeilen met behulp van LiDAR-beelden van drones. Het bevat scripts die .las/.laz bestanden verwerken. Je kunt verschillende filterfuncties toepassen op de .las/.laz bestanden om de gewenste output te verkrijgen. Elke gebruikte functie voegt een afkorting toe die de acties van de functie beschrijft. Meer informatie over het project is te vinden op https://www.digishape.nl/projecten/algoritmische-bepaling-van-waterstanden-met-remote-sensing en een rapport van het project (in het Nederlands) is te vinden in de 'docs' map.
@@ -19,12 +25,14 @@ Het script biedt de volgende functionaliteit:
    - **Spatiale filtering**: Filtert punten binnen waterlichamen
    - **Hoogte filtering**: Filtert punten op basis van minimum en maximum waterpeil
    - **Centerline filtering**: Filtert punten rondom een berekende centerline van waterlichamen met instelbare bufferafstand
+   - **Datumfiltering voor waterlichamen**: Filtert waterlichamen op basis van een referentiedatum
 
 3. **📊 Output generatie**
    - Genereert rasterbestanden (.tif) met 1x1m celgrootte
    - Berekent Z-waarden op basis van gemiddelde, mediaan of modus
    - Maakt visualisaties (.png) met waterlichamen en rasterdata
    - Genereert frequentiediagrammen voor specifieke RD-coördinaten
+   - Berekent statistieken (gemiddelde of mediaan) per polygoon uit een GDB- of GPKG-bestand
 
 4. **📝 Logging**
    - Uitgebreide logging van alle verwerkingsstappen
@@ -46,17 +54,20 @@ Het script kan worden uitgevoerd met verschillende opties:
 
 ```python
 main(
-    filter_geometries=False,     # Filter op waterlichamen
-    filter_minmax=False,         # Filter op hoogte
-    min_peil=-1,                # Minimum waterpeil
-    max_peil=1,                 # Maximum waterpeil
-    filter_centerline=False,    # Filter op centerline
-    buffer_distance=1.0,        # Bufferafstand tot centerline in meters
-    raster_averaging_mode="mode", # Berekening raster (mode/mean/median)
-    create_tif=True,            # Genereer TIF bestanden
-    output_file_name=[],        # Lijst met afkortingen voor output bestandsnaam
-    frequencydiagram=False,     # Genereer frequentiediagram
-    coordinates=(126012.5, 500481) # RD-coördinaten voor frequentiediagram
+    filter_geometries=False,           # Filter op waterlichamen
+    filter_minmax=False,               # Filter op hoogte
+    min_peil=-1,                       # Minimum waterpeil
+    max_peil=1,                        # Maximum waterpeil
+    waterdelen_reference_date=None,    # Referentiedatum voor waterlichamen
+    filter_centerline=False,           # Filter op centerline
+    buffer_distance=1.0,               # Bufferafstand tot centerline in meters
+    raster_averaging_mode="mode",      # Berekening raster (mode/mean/median)
+    create_tif=True,                   # Genereer TIF bestanden
+    output_file_name=[],               # Lijst met afkortingen voor output bestandsnaam
+    frequencydiagram=False,            # Genereer frequentiediagram
+    coordinates=(126012.5, 500481),    # RD-coördinaten voor frequentiediagram
+    polygon_file=None,                 # Pad naar .gdb of .gpkg bestand met polygonen
+    polygon_statistic="mean"           # Type statistiek voor polygonen (mean/median)
 )
 ```
 
@@ -83,7 +94,7 @@ heron/
 ├── data/
 │   ├── raw/           # Input .las/.laz bestanden
 │   ├── processed/     # Verwerkte bestanden
-│   └── output/        # Output bestanden (.tif, .png)
+│   └── output/        # Output bestanden (.tif, .png, .gpkg)
 ├── logs/              # Log bestanden
 ├── src/               # Broncode
 │   ├── chunk_files.py
@@ -105,6 +116,7 @@ heron/
 ### src/filter_spatial.py
 - `filter_spatial(points, waterdelen)`: Filtert punten binnen waterlichamen
 - `calculate_centerline(waterdelen, buffer_distance)`: Berekent centerline van waterlichamen
+- `calculate_polygon_statistics(raster_points, polygon_file, statistic)`: Berekent statistieken per polygoon
 
 ### src/filter_functions.py
 - `filter_by_z_value(points, min_peil, max_peil)`: Filtert punten op basis van hoogte
@@ -114,7 +126,7 @@ heron/
 - `generate_raster(points, mode)`: Genereert raster van punten met verschillende berekeningsmethoden
 
 ### src/get_waterdelen.py
-- `get_waterdelen(bbox)`: Haalt waterlichamen op via PDOK API
+- `get_waterdelen(bbox, reference_date)`: Haalt waterlichamen op via PDOK API, met optionele filterdatum
 
 ### src/create_plots.py
 - `plot_frequency(points, coordinates, filename)`: Genereert frequentiediagram voor specifieke locatie
@@ -130,6 +142,7 @@ heron/
 Het script genereert de volgende output bestanden:
 - `*.tif`: Rasterbestanden met gefilterde punten
 - `*.png`: Visualisaties van de resultaten
+- `*.gpkg`: GeoPackage bestanden met berekende polygoonstatistieken
 - `*.log`: Log bestanden met verwerkingsinformatie
 - `*_x_min_y_max.las`: Gesplitste LAS/LAZ bestanden
 
@@ -147,7 +160,11 @@ Alle verwerkingsstappen worden gelogd met:
 - numpy
 - pandas
 - geopandas
+- fiona
 - laspy
+- lazrs
+- xarray
+- rioxarray
 - contextily
 - matplotlib
-- pyproj
+- shapely

@@ -5,6 +5,8 @@ import pandas as pd
 import geopandas as gpd
 import numpy as np
 from pyproj import Transformer
+from typing import Optional, Union
+from datetime import datetime, date
 
 from src.get_waterdelen import get_waterdelen
 
@@ -15,7 +17,12 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-def load_data(lasfile, data_dir=r"data/raw/", crs="EPSG:28992"):
+def load_data(
+    lasfile, 
+    data_dir=r"data/raw/", 
+    crs="EPSG:28992", 
+    reference_date: Optional[Union[str, datetime, date]] = None
+):
     """
     Loads the .las files and converts them to a geopandas dataframe.
     Also loads the geometries used for filtering the .las files.
@@ -24,9 +31,12 @@ def load_data(lasfile, data_dir=r"data/raw/", crs="EPSG:28992"):
         lasfile (str): The complete filename of the .las/.laz file to load.
         data_dir (str, optional): The directory where the .las file is located. Defaults to "data/raw/".
         crs (str, optional): The coordinate reference system to use. Defaults to "EPSG:28992".
+        reference_date (str, datetime, date, optional): Reference date to filter waterdelen.
+                                                        Only returns waterdelen valid on this specific date.
+                                                        Defaults to None (returns all).
 
     Returns:
-        tuple: A tuple containing the points dataframe, the water bodies dataframe, and the lasX array.
+        tuple: A tuple containing the points dataframe, the waterdelen dataframe, and the lasX array.
     """
     laz_file = os.path.join(data_dir, lasfile)
     las = laspy.read(laz_file)
@@ -66,9 +76,9 @@ def load_data(lasfile, data_dir=r"data/raw/", crs="EPSG:28992"):
     bbox = transformer.transform_bounds(*bbox)
 
     # Get waterdelen for the area
-    waterdelen = get_waterdelen(bbox)
+    waterdelen = get_waterdelen(bbox, reference_date=reference_date)
     if waterdelen is None:
-        logger.warning("No water bodies found via PDOK API")
+        logger.warning("No waterdelen found via PDOK API")
         waterdelen = gpd.GeoDataFrame(
             columns=["geometry"], crs=crs
         )

@@ -12,10 +12,10 @@ Finally, a .tif file can be created with a size of 1x1m from the remaining point
 """
 
 import os
-from typing import List, Optional
+from typing import List, Optional, Union
 import logging
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, date
 
 import numpy as np
 import pandas as pd
@@ -189,6 +189,7 @@ def main(
     filter_minmax: bool = False,
     min_peil: int = -1,
     max_peil: int = 1,
+    waterdelen_reference_date: Optional[Union[str, datetime, date]] = None,
     filter_centerline: bool = False,
     buffer_distance: float = 1.0,
     raster_averaging_mode: str = "mode",
@@ -207,6 +208,9 @@ def main(
         filter_minmax (bool, optional): Whether to filter minmax. Defaults to False.
         min_peil (int, optional): The minimum water level. Defaults to -1.
         max_peil (int, optional): The maximum water level. Defaults to 1.
+        waterdelen_reference_date (str, datetime, date, optional): Reference date for filtering waterdelen.
+                                                                    Only returns water bodies valid on this date.
+                                                                    Defaults to None (returns all).
         filter_centerline (bool, optional): Whether to filter the centerline. Defaults to False.
         buffer_distance (float, optional): The buffer distance for centerline filtering. Defaults to 1.0.
         raster_averaging_mode (str, optional): The raster averaging mode. Defaults to "mode", can also be "mean" or "median".
@@ -245,7 +249,11 @@ def main(
     for lasfile in processed_files:
         try:
             logger.info(f"Starting processing of file: {lasfile}")
-            points, waterdelen, las_x = load_data(lasfile, data_dir="data/processed/")
+            points, waterdelen, las_x = load_data(
+                lasfile, 
+                data_dir="data/processed/", 
+                reference_date=waterdelen_reference_date
+            )
 
             points, output_file_name = apply_filters(
                 points,
@@ -342,6 +350,7 @@ if __name__ == "__main__":
         filter_geometries=True,
         frequencydiagram=False,
         buffer_distance=1,
+        #waterdelen_reference_date="2024-01-01",
         filter_centerline=True,
         polygon_file="data/external/peilafwijking.gdb",  # Example usage
         polygon_statistic="mean"
