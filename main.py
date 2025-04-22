@@ -350,7 +350,7 @@ if __name__ == "__main__":
         filter_geometries=True,
         frequencydiagram=False,
         buffer_distance=1,
-        #waterdelen_reference_date="2024-01-01",
+        waterdelen_reference_date="2023-01-01",
         filter_centerline=True,
         polygon_file="data/external/peilafwijking.gdb",  # Example usage
         polygon_statistic="mean"

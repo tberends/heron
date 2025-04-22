@@ -2,7 +2,7 @@
 
 [![Python](https://img.shields.io/badge/Python-3.9%2B-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
-[![Last Commit](https://img.shields.io/github/last-commit/TU-Delft-ICT/heron)](https://github.com/tberends/heron/commits/master)
+[![Last Commit](https://img.shields.io/github/last-commit/tberends/heron)](https://github.com/tberends/heron/commits/master)
 [![Issues](https://img.shields.io/github/issues/tberends/heron)](https://github.com/tberends/heron/issues)
 [![Status](https://img.shields.io/badge/Status-Active-success)](https://github.com/tberends/heron)
 
