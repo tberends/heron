@@ -111,7 +111,12 @@ def _build_ground_mask_from_atl08(
     ph_index_beg = np.asarray(f_atl03[path_beg][:]).reshape(-1).astype(int, copy=False)
 
     seg_pos = np.searchsorted(seg_ids, ph_seg_id)
-    valid = (seg_pos >= 0) & (seg_pos < seg_ids.size) & (seg_ids[seg_pos] == ph_seg_id)
+    n_seg = seg_ids.size
+    in_bounds = seg_pos < n_seg
+    # Must not index seg_ids[seg_pos] where seg_pos == n_seg (searchsorted can return len(seg_ids)).
+    seg_match = np.zeros(ph_seg_id.shape, dtype=bool)
+    seg_match[in_bounds] = seg_ids[seg_pos[in_bounds]] == ph_seg_id[in_bounds]
+    valid = in_bounds & seg_match
     if not np.any(valid):
         logger.warning(f"{beam}: No matching segment_id between ATL08 and ATL03 for this granule.")
         return np.zeros((n_photons,), dtype=bool)

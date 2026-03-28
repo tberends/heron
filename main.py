@@ -454,20 +454,21 @@ def main(
 
 
 if __name__ == "__main__":
-    # main(
-    #     filter_geometries=True,
-    #     frequencydiagram=False,
-    #     buffer_distance=1,
-    #     waterdelen_reference_date="2023-01-01",
-    #     filter_centerline=True,
-    #     polygon_file="data/external/peilafwijking.gdb",  # Example usage
-    #     polygon_statistic="mean"
-    # )
     main(
-        data_source="icesat",
-        icesat_temporal=("2025-01-01", "2025-12-31"),
-        icesat_bbox_lonlat=(4.7923, 52.4824, 5.0422, 52.6409), 
         filter_geometries=True,
-        create_tif=True,
-        waterdelen_reference_date="2025-01-01",
+        frequencydiagram=False,
+        buffer_distance=1,
+        waterdelen_reference_date="2023-01-01",
+        filter_centerline=True,
+        polygon_file="data/external/peilafwijking.gdb",  # Example usage
+        polygon_statistic="mean",
     )
+    # ICESat example (requires NASA Earthdata in .env):
+    # main(
+    #     data_source="icesat",
+    #     icesat_temporal=("2025-01-01", "2025-12-31"),
+    #     icesat_bbox_lonlat=(4.7923, 52.4824, 5.0422, 52.6409),
+    #     filter_geometries=True,
+    #     create_tif=True,
+    #     waterdelen_reference_date="2025-01-01",
+    # )
