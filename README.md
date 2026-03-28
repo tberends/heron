@@ -108,7 +108,7 @@ from main import main
 
 main(
     data_source="icesat",
-    icesat_temporal=("2026-01-01", "2026-01-31"),
+    icesat_temporal=("2025-01-01", "2025-01-31"),
     filter_geometries=True,
     create_tif=True,
 )
@@ -145,6 +145,12 @@ heron/
 ├── tests/             # Pytest-tests (o.a. LAZ-fixture, src-modules)
 ├── src/               # Broncode
 │   ├── icesat2/       # ATL03/ATL08 download en HDF5 → GeoDataFrame
+│   │   ├── __init__.py
+│   │   ├── config.py
+│   │   ├── download.py
+│   │   ├── fetch.py
+│   │   ├── geodataframe.py
+│   │   └── hdf5_atl03.py
 │   ├── chunk_files.py
 │   ├── create_plots.py
 │   ├── filter_functions.py
@@ -164,8 +170,19 @@ heron/
 - `get_waterdelen_for_points_gdf(points, crs, reference_date)`: PDOK waterdelen voor de extent van een punten-GeoDataFrame
 
 ### src/icesat2/
-- `fetch_icesat_points_gdf(...)`: download ATL03+ATL08, lees grond-photons, retourneert `(points_gdf, waterdelen_gdf, x_array)`
-- `photon_recarray_to_points_gdf`: structured numpy → LAS-compatibele GeoDataFrame
+
+Publieke API (ook geëxporteerd via `from src.icesat2 import …`):
+
+- **`Atl03Config`** (`config.py`): instellingen voor product (`ATL03`), versie (bv. `007`), beams, kandidaat-HDF5-veldnamen.
+- **`DEFAULT_ICESAT_BBOX_LONLAT`** (`config.py`): standaard WGS84-bbox `(lon_min, lat_min, lon_max, lat_max)` voor downloads (Noord-Holland).
+- **`fetch_icesat_points_gdf(...)`** (`fetch.py`): orkestreert download van **ATL03 én ATL08**, leest per granule grond-geclassificeerde photons, bouwt één punten-`GeoDataFrame`, haalt **waterdelen** op (zelfde aanpak als `load_data`), retourneert `(points_gdf, waterdelen_gdf, x_array)` waarbij `x_array` de X-kolom als numpy is (LAS-compatibel).
+- **`photon_recarray_to_points_gdf(...)`** (`geodataframe.py`): zet de structured numpy-array uit de HDF5-lezer om naar kolommen `X`, `Y`, `Z` (RD + NAP-hoogte), plus `delta_time` en `beam`, met geometrie en CRS RD New.
+
+Onderliggende helpers (voor uitbreiding of tests):
+
+- **`download_granules(...)`** (`download.py`): `earthaccess.login` + zoeken en downloaden van granules naar een cache-map; retourneert gedownloade paden.
+- **`list_hdf5_paths(...)`** (`download.py`): filtert een padlijst op `.h5` / `.hdf5` / `.hdf`.
+- **`read_atl03_points_from_hdf5(...)`** (`hdf5_atl03.py`): leest één ATL03-granule; koppelt via ATL08 `classed_pc_flag` / segmentindex aan grondphotons; transformeert WGS84-ellipsoïdaal naar RD+NAP (`EPSG:4979` → `EPSG:7415`, met 2D-fallback). Intern o.a. grondmasker uit ATL08 en beam-lus over `heights`.
 
 ### src/filter_spatial.py
 - `filter_spatial(points, waterdelen)`: Filtert punten binnen waterlichamen

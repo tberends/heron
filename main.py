@@ -465,12 +465,9 @@ if __name__ == "__main__":
     # )
     main(
         data_source="icesat",
-        icesat_temporal=("2026-01-01", "2026-01-31"),
+        icesat_temporal=("2025-01-01", "2025-01-31"),
         filter_geometries=True,
         create_tif=True,
         buffer_distance=1,
-        waterdelen_reference_date="2026-01-01",
-        filter_centerline=True,
-        polygon_file="data/external/peilafwijking.gdb",  # Example usage
-        polygon_statistic="mean"
+        waterdelen_reference_date="2025-01-01",
     )
