@@ -2,9 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-# lon_min, lat_min, lon_max, lat_max — Noord-Holland (Pronk et al. 2024, Remote Sens. 16, 2259)
-DEFAULT_ICESAT_BBOX_LONLAT: tuple[float, float, float, float] = (4.45, 52.14, 5.44, 53.20)
-
+# lon_min, lat_min, lon_max, lat_max — Beemster for Noord-Holland use (4.45, 52.14, 5.44, 53.20)
+DEFAULT_ICESAT_BBOX_LONLAT: tuple[float, float, float, float] = (4.7923, 52.4824, 5.0422, 52.6409)
 
 @dataclass(frozen=True)
 class Atl03Config:

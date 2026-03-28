@@ -75,7 +75,7 @@ main(
     polygon_statistic="mean",           # Type statistiek voor polygonen (mean/median)
     data_source="las",                  # "las" of "icesat"
     icesat_temporal=None,               # bij icesat: ("2025-01-01", "2025-12-31")
-    icesat_bbox_lonlat=None,           # optioneel WGS84 bbox; default = Noord-Holland (zie src.icesat2.config)
+    icesat_bbox_lonlat=None,           # optioneel WGS84 bbox; default = Beemster (zie src.icesat2.config)
     icesat_cache_dir="data/raw/icesat_hdf5",
     icesat_version="007",
 )
@@ -99,7 +99,7 @@ flowchart TD
 
 **Credentials:** gebruik je **Earthdata-gebruikersnaam en -wachtwoord**. Kopieer [`.env.example`](.env.example) naar `.env` en zet `EARTHDATA_USERNAME` en `EARTHDATA_PASSWORD`. Registratie: [Earthdata Login](https://urs.earthdata.nasa.gov/).
 
-**Let op:** er worden **ATL03- én ATL08-granules** gedownload (zelfde bbox en tijdsvenster); grondselectie sluit aan bij [Pronk et al. (2024)](https://doi.org/10.3390/rs16132259) (koppeling `classed_pc_flag`).
+**Let op:** er worden **ATL03- én ATL08-granules** gedownload (zelfde bbox en tijdsvenster); methode komt uit [Pronk et al. (2024)](https://doi.org/10.3390/rs16132259) (koppeling `classed_pc_flag`).
 
 **Voorbeeld** (vanuit de projectmap, bijv. in `python` of een eigen script):
 
@@ -107,10 +107,12 @@ flowchart TD
 from main import main
 
 main(
-    data_source="icesat",
-    icesat_temporal=("2025-01-01", "2025-01-31"),
-    filter_geometries=True,
-    create_tif=True,
+      data_source="icesat",
+      icesat_temporal=("2025-01-01", "2025-12-31"),
+      icesat_bbox_lonlat=(4.7923, 52.4824, 5.0422, 52.6409), # Beemster
+      filter_geometries=True,
+      create_tif=True,
+      waterdelen_reference_date="2025-01-01",
 )
 ```
 
@@ -170,8 +172,6 @@ heron/
 - `get_waterdelen_for_points_gdf(points, crs, reference_date)`: PDOK waterdelen voor de extent van een punten-GeoDataFrame
 
 ### src/icesat2/
-
-Publieke API (ook geëxporteerd via `from src.icesat2 import …`):
 
 - **`Atl03Config`** (`config.py`): instellingen voor product (`ATL03`), versie (bv. `007`), beams, kandidaat-HDF5-veldnamen.
 - **`DEFAULT_ICESAT_BBOX_LONLAT`** (`config.py`): standaard WGS84-bbox `(lon_min, lat_min, lon_max, lat_max)` voor downloads (Noord-Holland).

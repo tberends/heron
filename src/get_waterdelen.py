@@ -1,16 +1,21 @@
+import json
+import logging
+import time
+from datetime import datetime, date
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from typing import Optional, Tuple, Union
+from zipfile import ZipFile
+
+import geopandas as gpd
+import pandas as pd
 import requests
 from requests.structures import CaseInsensitiveDict
-import json
-import time
-from zipfile import ZipFile
-from io import BytesIO
-import geopandas as gpd
-from typing import Tuple, Optional, Union
-import logging
-from datetime import datetime, date
-import pandas as pd
 
 logger = logging.getLogger(__name__)
+
+# Chunk size when streaming BGT ZIP to disk (avoids holding full response in RAM).
+_ZIP_STREAM_CHUNK = 8 * 1024 * 1024
 
 def get_waterdelen(
     bbox: Tuple[float, float, float, float], 
@@ -38,6 +43,11 @@ def get_waterdelen(
         
         # Convert bbox to polygon WKT string
         minx, miny, maxx, maxy = bbox
+        area_km2 = max(0.0, (maxx - minx) * (maxy - miny)) / 1_000_000.0
+        logger.info(
+            f"PDOK BGT request bbox (RD, m): ({minx:.1f}, {miny:.1f}) – ({maxx:.1f}, {maxy:.1f}); "
+            f"~{area_km2:.0f} km² extent"
+        )
         geofilter = f'POLYGON(({minx} {miny},{maxx} {miny},{maxx} {maxy},{minx} {maxy},{minx} {miny}))'
         
         # Request download URL
@@ -71,18 +81,37 @@ def get_waterdelen(
             elif status['status'] == 'FAILED':
                 raise Exception("BGT download failed")
                 
-            logger.info(f"Download progress: {status.get('progress', '...')}%")
+            logger.info(f"PDOK BGT export progress: {status.get('progress', '...')}%")
             time.sleep(1)
         
-        # Download and process ZIP
-        zip_response = requests.get(f"{base_url}{zip_url}")
-        zip_response.raise_for_status()
-        
-        with ZipFile(BytesIO(zip_response.content)) as zipfile:
-            # Read first GML file in ZIP
-            first_file = zipfile.namelist()[0]
-            with zipfile.open(first_file) as gml_file:
-                gdf = gpd.read_file(gml_file)
+        # Download ZIP to disk (stream), then extract and read GML from a real path.
+        # Loading the full ZIP into BytesIO and passing a zipfile handle into pyogrio/GDAL
+        # has been associated with native crashes on large BGT exports (macOS).
+        download_href = f"{base_url}{zip_url}"
+        logger.info("PDOK BGT export ready; downloading ZIP (stream to disk)…")
+        with TemporaryDirectory(prefix="heron_bgt_") as tmp:
+            tmp_path = Path(tmp)
+            zip_path = tmp_path / "bgt_waterdeel.zip"
+            with requests.get(download_href, stream=True, timeout=600) as zip_response:
+                zip_response.raise_for_status()
+                with open(zip_path, "wb") as out_f:
+                    for chunk in zip_response.iter_content(chunk_size=_ZIP_STREAM_CHUNK):
+                        if chunk:
+                            out_f.write(chunk)
+            zip_bytes = zip_path.stat().st_size
+            logger.info(f"PDOK BGT ZIP on disk ({zip_bytes // (1024 * 1024)} MiB); extracting…")
+
+            with ZipFile(zip_path, "r") as zipfile:
+                zipfile.extractall(tmp_path)
+
+            gml_paths = sorted(tmp_path.rglob("*.gml"))
+            if not gml_paths:
+                raise ValueError("No .gml file found in BGT ZIP")
+            gml_path = gml_paths[0]
+            if len(gml_paths) > 1:
+                logger.info(f"Using first GML in archive: {gml_path.name} ({len(gml_paths)} candidates)")
+            logger.info(f"Reading waterdeel geometries with GeoPandas/pyogrio: {gml_path}")
+            gdf = gpd.read_file(gml_path)
         
         # Check column names in case they're different in newer API versions
         reg_col = 'tijdstipRegistratie' if 'tijdstipRegistratie' in gdf.columns else 'beginRegistratie'
