@@ -12,7 +12,8 @@ Finally, a .tif file can be created with a size of 1x1m from the remaining point
 """
 
 import os
-from typing import List, Optional, Union
+import re
+from typing import List, Literal, Optional, Tuple, Union
 import logging
 from pathlib import Path
 from datetime import datetime, date
@@ -24,14 +25,15 @@ import laspy
 import contextily as ctx
 import matplotlib.pyplot as plt
 from pyproj import Transformer
+from dotenv import load_dotenv
 
 from src.chunk_files import split_las_file
 from src.import_data import load_data
+from src.icesat2 import Atl03Config, DEFAULT_ICESAT_BBOX_LONLAT, fetch_icesat_points_gdf
 from src.filter_spatial import filter_spatial, calculate_centerline, calculate_polygon_statistics
 from src.generate_raster import generate_raster
 from src.filter_functions import filter_by_z_value, filter_by_proximity_to_centerline
 from src.create_plots import plot_frequency, plot_map
-from src.get_waterdelen import get_waterdelen
 
 
 # Configure logging
@@ -150,6 +152,56 @@ def save_tif(raster_points, lasfile, out_name_full):
     logger.info(f"TIF file saved to: {TIF_PATH}")
 
 
+def _icesat_output_stem(temporal: Tuple[str, str]) -> str:
+    raw = f"{temporal[0]}_{temporal[1]}"
+    safe = re.sub(r"[^\w.\-]+", "_", raw)
+    return f"icesat_ATL03_{safe}"
+
+
+def run_single_dataset_pipeline(
+    points: gpd.GeoDataFrame,
+    waterdelen: gpd.GeoDataFrame,
+    output_stem: str,
+    output_file_name: List[str],
+    filter_geometries: bool,
+    filter_minmax: bool,
+    min_peil: int,
+    max_peil: int,
+    filter_centerline: bool,
+    buffer_distance: float,
+    frequencydiagram: bool,
+    coordinates: tuple,
+    create_tif: bool,
+    raster_averaging_mode: str,
+) -> tuple[gpd.GeoDataFrame, gpd.GeoDataFrame, List[str]]:
+    points, output_file_name = apply_filters(
+        points,
+        waterdelen,
+        filter_geometries,
+        filter_minmax,
+        min_peil,
+        max_peil,
+        filter_centerline,
+        buffer_distance,
+        output_file_name,
+    )
+
+    if frequencydiagram:
+        plot_frequency(points, coordinates, output_stem)
+
+    raster_points = None
+    if create_tif and points.shape[0] > 0:
+        raster_points = generate_raster(points, raster_averaging_mode)
+        logger.info(f"Points are averaged based on their {raster_averaging_mode} value")
+
+    out_name_full = "_".join(output_file_name)
+    plot_map(raster_points, points, waterdelen, output_stem, out_name_full)
+    if create_tif:
+        save_tif(raster_points, output_stem, out_name_full)
+
+    return points, waterdelen, output_file_name
+
+
 def find_las_files(data_dir: str = "data/raw/") -> List[str]:
     """
     Finds all .las and .laz files in the specified directory.
@@ -194,14 +246,19 @@ def main(
     buffer_distance: float = 1.0,
     raster_averaging_mode: str = "mode",
     create_tif: bool = True,
-    output_file_name: List[str] = [],
+    output_file_name: Optional[List[str]] = None,
     frequencydiagram: bool = False,
     coordinates: tuple = (126012.5, 500481),
     polygon_file: Optional[str] = None,
     polygon_statistic: str = "mean",
+    data_source: Literal["las", "icesat"] = "las",
+    icesat_temporal: Optional[Tuple[str, str]] = None,
+    icesat_bbox_lonlat: Optional[Tuple[float, float, float, float]] = None,
+    icesat_cache_dir: Union[str, Path] = "data/raw/icesat_hdf5",
+    icesat_version: str = "007",
 ):
     """
-    The main function that processes all LAS/LAZ files in the data/raw directory.
+    Process LAS/LAZ files from ``data/raw`` (default) or fetch ICESat-2 ATL03 photons and run the same pipeline.
 
     Args:
         filter_geometries (bool, optional): Whether to filter geometries. Defaults to False.
@@ -215,90 +272,141 @@ def main(
         buffer_distance (float, optional): The buffer distance for centerline filtering. Defaults to 1.0.
         raster_averaging_mode (str, optional): The raster averaging mode. Defaults to "mode", can also be "mean" or "median".
         create_tif (bool, optional): Whether to create a .tif file. Defaults to True.
-        output_file_name (List[str], optional): The name of the output file. Defaults to [].
+        output_file_name (List[str], optional): Accumulator for output filename tags. Defaults to a new list per run.
         frequencydiagram (bool, optional): Whether to plot the frequency. Defaults to False.
         coordinates (tuple, optional): The coordinates in RD to plot the frequency. Defaults to (126012.5, 500481).
         polygon_file (Optional[str], optional): Path to the .gdb or .gpkg file containing polygons. Defaults to None.
         polygon_statistic (str, optional): Type of statistic to calculate ("mean" or "median"). Defaults to "mean".
+        data_source (str): ``las`` for local LAS/LAZ; ``icesat`` for NASA ATL03+ATL08 download.
+        icesat_temporal (tuple, optional): ``(start, end)`` date strings (required when ``data_source`` is ``"icesat"``).
+        icesat_bbox_lonlat (tuple, optional): ``(lon_min, lat_min, lon_max, lat_max)`` in WGS84; default Noord-Holland.
+        icesat_cache_dir: Directory for downloaded HDF5 granules.
+        icesat_version: Product version for ATL03 and ATL08 (e.g. ``007``).
     """
+    if output_file_name is None:
+        output_file_name = []
 
     # Clear processed data directory and output directory
     [os.remove(os.path.join("data/processed/", f)) for f in os.listdir("data/processed/") if f.endswith(".las")]
     [os.remove(os.path.join("data/output/", f)) for f in os.listdir("data/output/") if f.endswith(".png") or f.endswith(".tif") or f.endswith(".gpkg")]
 
-    # Find all LAS/LAZ files to process
-    las_files = find_las_files()
-    
-    if not las_files:
-        logger.error("No files to process. Exiting.")
-        return
-    
-    # Chunk files if needed in size of 1000x1000 and 1 million points per iteration
-    for lasfile in las_files:
-        logger.info(f"Splitting file: {lasfile}")
-        lasfile = os.path.join("data/raw/", lasfile)
-        split_las_file(lasfile, "data/processed/", (1000, 1000), 10**6)
+    all_results: List[dict] = []
 
-    processed_files = find_las_files("data/processed/")
-    if not processed_files:
-        logger.error("No files to process. Exiting.")
-        return
-    
-    # Process each file and collect results
-    all_results = []
-    for lasfile in processed_files:
+    if data_source == "icesat":
+        if icesat_temporal is None:
+            logger.error("icesat_temporal (start, end) is required when data_source='icesat'. Exiting.")
+            return
+
+        load_dotenv()
+        bbox = icesat_bbox_lonlat if icesat_bbox_lonlat is not None else DEFAULT_ICESAT_BBOX_LONLAT
+        cfg = Atl03Config(version=str(icesat_version))
+
         try:
-            logger.info(f"Starting processing of file: {lasfile}")
-            points, waterdelen, las_x = load_data(
-                lasfile, 
-                data_dir="data/processed/", 
-                reference_date=waterdelen_reference_date
+            points, waterdelen, _ = fetch_icesat_points_gdf(
+                temporal=icesat_temporal,
+                logger=logger,
+                bbox_lonlat=bbox,
+                cache_dir=icesat_cache_dir,
+                config=cfg,
+                reference_date=waterdelen_reference_date,
             )
+        except Exception as e:
+            logger.error(f"ICESat fetch failed: {e}")
+            return
 
-            points, output_file_name = apply_filters(
+        if points.empty:
+            logger.error("No ICESat points to process. Exiting.")
+            return
+
+        stem = _icesat_output_stem(icesat_temporal)
+        logger.info(f"ICESat dataset stem for outputs: {stem}")
+
+        try:
+            points, waterdelen, output_file_name = run_single_dataset_pipeline(
                 points,
                 waterdelen,
+                stem,
+                output_file_name,
                 filter_geometries,
                 filter_minmax,
                 min_peil,
                 max_peil,
                 filter_centerline,
                 buffer_distance,
-                output_file_name,
+                frequencydiagram,
+                coordinates,
+                create_tif,
+                raster_averaging_mode,
             )
-
-            if frequencydiagram:
-                plot_frequency(points, coordinates, os.path.splitext(lasfile)[0])
-
-            raster_points = None
-            if create_tif and points.shape[0] > 0:
-                raster_points = generate_raster(points, raster_averaging_mode)
-                logger.info(f"Points are averaged based on their {raster_averaging_mode} value")
-
-            out_name_full = "_".join(output_file_name)
-            
-            plot_map(raster_points, points, waterdelen, os.path.splitext(lasfile)[0], out_name_full)
-            if create_tif:
-                save_tif(raster_points, os.path.splitext(lasfile)[0], out_name_full)
-
-            output_file_name = []
-            logger.info(f"Finished processing file: {lasfile}")
-            
-            all_results.append({
-                'points': points,
-                'waterdelen': waterdelen,
-                'filters': output_file_name,
-            })
-            
+            all_results.append(
+                {"points": points, "waterdelen": waterdelen, "filters": list(output_file_name)}
+            )
+            logger.info("Finished processing ICESat dataset")
         except Exception as e:
-            logger.error(f"Error processing file {lasfile}: {str(e)}")
-            continue
+            logger.error(f"Error processing ICESat data: {e}")
+            return
+
+    else:
+        las_files = find_las_files()
+
+        if not las_files:
+            logger.error("No files to process. Exiting.")
+            return
+
+        for lasfile in las_files:
+            logger.info(f"Splitting file: {lasfile}")
+            raw_path = os.path.join("data/raw/", lasfile)
+            split_las_file(raw_path, "data/processed/", (1000, 1000), 10**6)
+
+        processed_files = find_las_files("data/processed/")
+        if not processed_files:
+            logger.error("No files to process. Exiting.")
+            return
+
+        for lasfile in processed_files:
+            try:
+                logger.info(f"Starting processing of file: {lasfile}")
+                points, waterdelen, las_x = load_data(
+                    lasfile,
+                    data_dir="data/processed/",
+                    reference_date=waterdelen_reference_date,
+                )
+
+                stem = os.path.splitext(lasfile)[0]
+                points, waterdelen, output_file_name = run_single_dataset_pipeline(
+                    points,
+                    waterdelen,
+                    stem,
+                    output_file_name,
+                    filter_geometries,
+                    filter_minmax,
+                    min_peil,
+                    max_peil,
+                    filter_centerline,
+                    buffer_distance,
+                    frequencydiagram,
+                    coordinates,
+                    create_tif,
+                    raster_averaging_mode,
+                )
+
+                logger.info(f"Finished processing file: {lasfile}")
+
+                all_results.append(
+                    {"points": points, "waterdelen": waterdelen, "filters": list(output_file_name)}
+                )
+                output_file_name = []
+
+            except Exception as e:
+                logger.error(f"Error processing file {lasfile}: {str(e)}")
+                continue
     
     # Create combined outputs
     if all_results:
         combined_points = pd.concat([r['points'] for r in all_results])
         combined_waterdelen = pd.concat([r['waterdelen'] for r in all_results]).drop_duplicates()
-        output_file_name = 'combined_results_' + '_'.join(all_results[0]['filters'])
+        filter_tags = "_".join(all_results[0]["filters"]) if all_results[0]["filters"] else "nofilter"
+        output_file_name = "combined_results_" + filter_tags
         
         # Generate raster for combined points
         combined_raster_points = None
@@ -346,11 +454,22 @@ def main(
 
 
 if __name__ == "__main__":
+    # main(
+    #     filter_geometries=True,
+    #     frequencydiagram=False,
+    #     buffer_distance=1,
+    #     waterdelen_reference_date="2023-01-01",
+    #     filter_centerline=True,
+    #     polygon_file="data/external/peilafwijking.gdb",  # Example usage
+    #     polygon_statistic="mean"
+    # )
     main(
+        data_source="icesat",
+        icesat_temporal=("2026-01-01", "2026-01-31"),
         filter_geometries=True,
-        frequencydiagram=False,
+        create_tif=True,
         buffer_distance=1,
-        waterdelen_reference_date="2023-01-01",
+        waterdelen_reference_date="2026-01-01",
         filter_centerline=True,
         polygon_file="data/external/peilafwijking.gdb",  # Example usage
         polygon_statistic="mean"

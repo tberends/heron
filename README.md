@@ -43,15 +43,15 @@ Het script biedt de volgende functionaliteit:
 ## Installatie
 
 1. Clone de repository
-2. Zorg voor **Python 3.10 of nieuwer** (vereist door o.a. GeoPandas 1.1.x).
-3. Installeer de vereiste packages:
+2. Zorg voor **Python 3.10 of nieuwer**.
+3. Installeer de vereiste packages. Aanbevolen: Conda-omgeving **`heron`**:
 ```bash
-pip install -r requirements.txt
+conda run -n heron pip install -r requirements.txt
 ```
 
 ## Tests
 
-Na `pip install -r requirements.txt` (bevat pytest): vanaf de reporoot `pytest tests/ -v`. Tests die `data/raw/X126000Y500000.laz` (of reporoot) nodig hebben, worden overgeslagen als dat bestand ontbreekt; overige tests gebruiken mocks of synthetische data.
+Na installatie in je omgeving (bijv. `conda activate heron`): vanaf de reporoot `pytest tests/ -v`. Met conda: `conda run -n heron pytest tests/ -v`. Tests die `data/raw/X126000Y500000.laz` (of reporoot) nodig hebben, worden overgeslagen als dat bestand ontbreekt; overige tests gebruiken mocks of synthetische data.
 
 ## Gebruik
 
@@ -72,9 +72,49 @@ main(
     frequencydiagram=False,            # Genereer frequentiediagram
     coordinates=(126012.5, 500481),    # RD-coördinaten voor frequentiediagram
     polygon_file=None,                 # Pad naar .gdb of .gpkg bestand met polygonen
-    polygon_statistic="mean"           # Type statistiek voor polygonen (mean/median)
+    polygon_statistic="mean",           # Type statistiek voor polygonen (mean/median)
+    data_source="las",                  # "las" of "icesat"
+    icesat_temporal=None,               # bij icesat: ("2025-01-01", "2025-12-31")
+    icesat_bbox_lonlat=None,           # optioneel WGS84 bbox; default = Noord-Holland (zie src.icesat2.config)
+    icesat_cache_dir="data/raw/icesat_hdf5",
+    icesat_version="007",
 )
 ```
+
+### ICESat-2 (ATL03 + ATL08)
+
+In plaats van lokale LAS/LAZ kun je photons ophalen via **NASA Earthdata** (`earthaccess`). De pipeline zet ze om naar een **GeoDataFrame** met dezelfde kolommen als LAS (`X`, `Y`, `Z` in RD, `Z` = NAP na transformatie), zodat filters, raster en plots hetzelfde blijven.
+
+**Workflow (hoog niveau):**
+
+```mermaid
+flowchart TD
+  main[main.py]
+  main --> branch{data_source}
+  branch -->|las| lasFlow[find_las chunk load_data]
+  branch -->|icesat| iceFlow[fetch_icesat_points_gdf]
+  lasFlow --> core[apply_filters generate_raster plot_map]
+  iceFlow --> core
+```
+
+**Credentials:** gebruik je **Earthdata-gebruikersnaam en -wachtwoord**. Kopieer [`.env.example`](.env.example) naar `.env` en zet `EARTHDATA_USERNAME` en `EARTHDATA_PASSWORD`. Registratie: [Earthdata Login](https://urs.earthdata.nasa.gov/).
+
+**Let op:** er worden **ATL03- én ATL08-granules** gedownload (zelfde bbox en tijdsvenster); grondselectie sluit aan bij [Pronk et al. (2024)](https://doi.org/10.3390/rs16132259) (koppeling `classed_pc_flag`).
+
+**Voorbeeld** (vanuit de projectmap, bijv. in `python` of een eigen script):
+
+```python
+from main import main
+
+main(
+    data_source="icesat",
+    icesat_temporal=("2026-01-01", "2026-01-31"),
+    filter_geometries=True,
+    create_tif=True,
+)
+```
+
+Een run leegt `data/output/` (en `.las` in `data/processed/`) op dezelfde manier als bij LAS-runs. De methodiek is overgenomen uit; Pronk, M.; Eleveld, M.; Ledoux, H. *Assessing Vertical Accuracy and Spatial Coverage of ICESat-2 and GEDI Spaceborne Lidar for Creating Global Terrain Models.* *Remote Sens.* **2024**, *16*, 2259. [https://doi.org/10.3390/rs16132259](https://doi.org/10.3390/rs16132259).
 
 ### Bestanden opsplitsen
 
@@ -104,6 +144,7 @@ heron/
 ├── logs/              # Log bestanden
 ├── tests/             # Pytest-tests (o.a. LAZ-fixture, src-modules)
 ├── src/               # Broncode
+│   ├── icesat2/       # ATL03/ATL08 download en HDF5 → GeoDataFrame
 │   ├── chunk_files.py
 │   ├── create_plots.py
 │   ├── filter_functions.py
@@ -120,6 +161,11 @@ heron/
 
 ### src/import_data.py
 - `load_data(lasfile, data_dir)`: Laadt en verwerkt .las/.laz bestanden
+- `get_waterdelen_for_points_gdf(points, crs, reference_date)`: PDOK waterdelen voor de extent van een punten-GeoDataFrame
+
+### src/icesat2/
+- `fetch_icesat_points_gdf(...)`: download ATL03+ATL08, lees grond-photons, retourneert `(points_gdf, waterdelen_gdf, x_array)`
+- `photon_recarray_to_points_gdf`: structured numpy → LAS-compatibele GeoDataFrame
 
 ### src/filter_spatial.py
 - `filter_spatial(points, waterdelen)`: Filtert punten binnen waterlichamen
@@ -179,6 +225,7 @@ Zie `requirements.txt` voor vaste versies. Kernpakketten:
 - rioxarray
 - contextily
 - matplotlib
+- earthaccess, h5py, python-dotenv (ICESat-2 download en `.env`)
 - pytest (tests draaien)
 
 ## Bijdragen

@@ -17,6 +17,36 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+
+def get_waterdelen_for_points_gdf(
+    points: gpd.GeoDataFrame,
+    crs: str = "EPSG:28992",
+    reference_date: Optional[Union[str, datetime, date]] = None,
+    bbox_buffer: float = 100.0,
+) -> gpd.GeoDataFrame:
+    """
+    Fetch PDOK waterdelen for the spatial extent of ``points`` (same logic as ``load_data``).
+    """
+    if points.empty:
+        return gpd.GeoDataFrame(columns=["geometry"], crs=crs)
+
+    bounds = points.total_bounds
+    bbox = (
+        bounds[0] - bbox_buffer,
+        bounds[1] - bbox_buffer,
+        bounds[2] + bbox_buffer,
+        bounds[3] + bbox_buffer,
+    )
+    transformer = Transformer.from_crs(crs, "EPSG:28992", always_xy=True)
+    bbox_28992 = transformer.transform_bounds(*bbox)
+
+    waterdelen = get_waterdelen(bbox_28992, reference_date=reference_date)
+    if waterdelen is None:
+        logger.warning("No waterdelen found via PDOK API")
+        return gpd.GeoDataFrame(columns=["geometry"], crs=crs)
+    return waterdelen
+
+
 def load_data(
     lasfile, 
     data_dir=r"data/raw/", 
@@ -62,25 +92,6 @@ def load_data(
         data_coord, geometry=gpd.points_from_xy(data_coord.X, data_coord.Y), crs=crs
     )
 
-    # Calculate bounding box from points with some buffer
-    bounds = points.total_bounds
-    bbox_buffer = 100  # 100 meter buffer
-    bbox = (
-        bounds[0] - bbox_buffer,
-        bounds[1] - bbox_buffer,
-        bounds[2] + bbox_buffer,
-        bounds[3] + bbox_buffer
-    )
-    # Transform the bounding box to EPSG:28992 for PDOK API
-    transformer = Transformer.from_crs(crs, "EPSG:28992", always_xy=True)
-    bbox = transformer.transform_bounds(*bbox)
-
-    # Get waterdelen for the area
-    waterdelen = get_waterdelen(bbox, reference_date=reference_date)
-    if waterdelen is None:
-        logger.warning("No waterdelen found via PDOK API")
-        waterdelen = gpd.GeoDataFrame(
-            columns=["geometry"], crs=crs
-        )
+    waterdelen = get_waterdelen_for_points_gdf(points, crs=crs, reference_date=reference_date)
 
     return points, waterdelen, las_x
