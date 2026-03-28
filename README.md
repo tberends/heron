@@ -10,37 +10,37 @@
 
 Dit project, gefinancierd door Digishape Seed Money, richt zich op het inspecteren van waterpeilen met behulp van LiDAR-beelden van drones. Het bevat scripts die .las/.laz bestanden verwerken. Je kunt verschillende filterfuncties toepassen op de .las/.laz bestanden om de gewenste output te verkrijgen. Elke gebruikte functie voegt een afkorting toe die de acties van de functie beschrijft. Meer informatie over het project is te vinden op https://www.digishape.nl/projecten/algoritmische-bepaling-van-waterstanden-met-remote-sensing en een rapport van het project (in het Nederlands) is te vinden in de 'docs' map.
 
-## 📋 Functionaliteit
+## Functionaliteit
 
 Het script biedt de volgende functionaliteit:
 
-1. **🔄 Automatische bestandsverwerking**
+1. **Automatische bestandsverwerking**
    - Verwerkt automatisch alle .las/.laz bestanden in de `data/raw/` directory
    - Ondersteunt zowel .las als .laz formaten
    - Voorkomt dubbele verwerking van bestanden
    - Logt alle verwerkingsstappen met timestamp
    - Kan grote bestanden opsplitsen in kleinere delen voor efficiëntere verwerking
 
-2. **🔍 Filtering opties**
+2. **Filtering opties**
    - **Spatiale filtering**: Filtert punten binnen waterlichamen
    - **Hoogte filtering**: Filtert punten op basis van minimum en maximum waterpeil
    - **Centerline filtering**: Filtert punten rondom een berekende centerline van waterlichamen met instelbare bufferafstand
    - **Datumfiltering voor waterlichamen**: Filtert waterlichamen op basis van een referentiedatum
 
-3. **📊 Output generatie**
+3. **Output generatie**
    - Genereert rasterbestanden (.tif) met 1x1m celgrootte
    - Berekent Z-waarden op basis van gemiddelde, mediaan of modus
    - Maakt visualisaties (.png) met waterlichamen en rasterdata
    - Genereert frequentiediagrammen voor specifieke RD-coördinaten
    - Berekent statistieken (gemiddelde of mediaan) per polygoon uit een GDB- of GPKG-bestand
 
-4. **📝 Logging**
+4. **Logging**
    - Uitgebreide logging van alle verwerkingsstappen
    - Logs worden opgeslagen in de `logs/` directory met timestamp
    - Bevat informatie over verwerking, fouten en resultaten
    - Logging naar zowel bestand als console
 
-## 🛠️ Installatie
+## Installatie
 
 1. Clone de repository
 2. Zorg voor **Python 3.10 of nieuwer** (vereist door o.a. GeoPandas 1.1.x).
@@ -49,7 +49,11 @@ Het script biedt de volgende functionaliteit:
 pip install -r requirements.txt
 ```
 
-## 💻 Gebruik
+## Tests
+
+Na `pip install -r requirements.txt` (bevat pytest): vanaf de reporoot `pytest tests/ -v`. Tests die `data/raw/X126000Y500000.laz` (of reporoot) nodig hebben, worden overgeslagen als dat bestand ontbreekt; overige tests gebruiken mocks of synthetische data.
+
+## Gebruik
 
 Het script kan worden uitgevoerd met verschillende opties:
 
@@ -72,7 +76,7 @@ main(
 )
 ```
 
-### 📦 Bestanden opsplitsen
+### Bestanden opsplitsen
 
 Grote LAS/LAZ bestanden kunnen worden opgesplitst in kleinere delen voor efficiëntere verwerking:
 
@@ -88,7 +92,7 @@ Parameters:
 
 De bestanden worden opgesplitst op basis van ruimtelijke grenzen en krijgen een naam in het formaat: `originele_naam_x_min_y_max.las`
 
-## 📁 Directory structuur
+## Directory structuur
 
 ```
 heron/
@@ -98,6 +102,7 @@ heron/
 │   ├── processed/     # Verwerkte bestanden
 │   └── output/        # Output bestanden (.tif, .png, .gpkg)
 ├── logs/              # Log bestanden
+├── tests/             # Pytest-tests (o.a. LAZ-fixture, src-modules)
 ├── src/               # Broncode
 │   ├── chunk_files.py
 │   ├── create_plots.py
@@ -106,10 +111,12 @@ heron/
 │   ├── generate_raster.py
 │   ├── get_waterdelen.py
 │   └── import_data.py
+├── pytest.ini
+├── requirements.txt
 └── main.py           # Hoofdscript
 ```
 
-## 📚 Module beschrijvingen
+## Module beschrijvingen
 
 ### src/import_data.py
 - `load_data(lasfile, data_dir)`: Laadt en verwerkt .las/.laz bestanden
@@ -138,7 +145,7 @@ heron/
 - `recursive_split(x_min, y_min, x_max, y_max, max_x_size, max_y_size)`: Berekent de grenzen voor de splitsing
 - `tuple_size(string)`: Converteert een string in het formaat 'breedte x hoogte' naar een tuple
 
-## 📤 Output bestanden
+## Output bestanden
 
 Het script genereert de volgende output bestanden:
 - `*.tif`: Rasterbestanden met gefilterde punten
@@ -147,7 +154,7 @@ Het script genereert de volgende output bestanden:
 - `*.log`: Log bestanden met verwerkingsinformatie
 - `*_x_min_y_max.las`: Gesplitste LAS/LAZ bestanden
 
-## 📝 Logging
+## Logging
 
 Alle verwerkingsstappen worden gelogd met:
 - Timestamp
@@ -156,7 +163,7 @@ Alle verwerkingsstappen worden gelogd met:
 - Bestandsnamen en verwerkingsresultaten
 - Logging naar zowel bestand als console
 
-## 📦 Afhankelijkheden
+## Afhankelijkheden
 
 Zie `requirements.txt` voor vaste versies. Kernpakketten:
 
@@ -172,3 +179,16 @@ Zie `requirements.txt` voor vaste versies. Kernpakketten:
 - rioxarray
 - contextily
 - matplotlib
+- pytest (tests draaien)
+
+## Bijdragen
+
+Bijdragen zijn welkom. Kort overzicht:
+
+1. **Issues** — Voor bugs, wensen of vragen kun je een [GitHub-issue](https://github.com/tberends/heron/issues) openen.
+2. **Pull requests** — Fork de repository, maak een branch vanaf `master`, implementeer je wijziging en open een PR met een duidelijke beschrijving (wat en waarom).
+3. **Tests** — Voer `pytest tests/ -v` uit voordat je een PR indient; voeg waar passend tests toe voor nieuwe of gewijzigde logica in `src/` of `main.py`.
+4. **Stijl** — Sluit aan bij de bestaande code (imports, logging, type hints waar al gangbaar). Houd wijzigingen zo klein mogelijk en gericht op één onderwerp per PR.
+5. **Data en geheimen** — Commit geen grote LiDAR-bestanden, persoonsgegevens of API-sleutels; gebruik `.env` of lokale data buiten git zoals nu in `.gitignore` bedoeld.
+
+Voor inhoudelijke vragen over het Digishape-project, zie de link naar het project in de introductie hierboven.

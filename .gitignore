@@ -4,6 +4,11 @@
 # Behalve deze specifieke bestanden
 !X126000Y500000.laz
 
+# Pytest + testsuite (wel versioneren; __pycache__ in tests/ blijft genegeerd via regel hieronder)
+!/pytest.ini
+!/tests/
+!/tests/**
+
 # Negeer specifieke directories
 data/processed/
 data/output/
@@ -11,6 +16,7 @@ logs/
 
 # Python
 __pycache__/
+.pytest_cache/
 *.py[cod]
 *$py.class
 *.so
