@@ -9,9 +9,20 @@
 !/tests/
 !/tests/**
 
+# Broncode en projectroot (anders zou regel `*` alles verbergen)
+!/src/
+!/src/**
+!/main.py
+!/requirements.txt
+!/.env.example
+!/icesat2_paper.py
+!/icesat2_atl03.py
+!/icesat2_atl08.py
+
 # Negeer specifieke directories
 data/processed/
 data/output/
+data/raw/icesat_hdf5/
 logs/
 
 # Python

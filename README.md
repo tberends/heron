@@ -43,15 +43,15 @@ Het script biedt de volgende functionaliteit:
 ## Installatie
 
 1. Clone de repository
-2. Zorg voor **Python 3.10 of nieuwer** (vereist door o.a. GeoPandas 1.1.x).
-3. Installeer de vereiste packages:
+2. Zorg voor **Python 3.10 of nieuwer**.
+3. Installeer de vereiste packages. Aanbevolen: Conda-omgeving **`heron`**:
 ```bash
-pip install -r requirements.txt
+conda run -n heron pip install -r requirements.txt
 ```
 
 ## Tests
 
-Na `pip install -r requirements.txt` (bevat pytest): vanaf de reporoot `pytest tests/ -v`. Tests die `data/raw/X126000Y500000.laz` (of reporoot) nodig hebben, worden overgeslagen als dat bestand ontbreekt; overige tests gebruiken mocks of synthetische data.
+Na installatie in je omgeving (bijv. `conda activate heron`): vanaf de reporoot `pytest tests/ -v`. Met conda: `conda run -n heron pytest tests/ -v`. Tests die `data/raw/X126000Y500000.laz` (of reporoot) nodig hebben, worden overgeslagen als dat bestand ontbreekt; overige tests gebruiken mocks of synthetische data.
 
 ## Gebruik
 
@@ -72,9 +72,51 @@ main(
     frequencydiagram=False,            # Genereer frequentiediagram
     coordinates=(126012.5, 500481),    # RD-coördinaten voor frequentiediagram
     polygon_file=None,                 # Pad naar .gdb of .gpkg bestand met polygonen
-    polygon_statistic="mean"           # Type statistiek voor polygonen (mean/median)
+    polygon_statistic="mean",           # Type statistiek voor polygonen (mean/median)
+    data_source="las",                  # "las" of "icesat"
+    icesat_temporal=None,               # bij icesat: ("2025-01-01", "2025-12-31")
+    icesat_bbox_lonlat=None,           # optioneel WGS84 bbox; default = Beemster (zie src.icesat2.config)
+    icesat_cache_dir="data/raw/icesat_hdf5",
+    icesat_version="007",
 )
 ```
+
+### ICESat-2 (ATL03 + ATL08)
+
+In plaats van lokale LAS/LAZ kun je photons ophalen via **NASA Earthdata** (`earthaccess`). De pipeline zet ze om naar een **GeoDataFrame** met dezelfde kolommen als LAS (`X`, `Y`, `Z` in RD, `Z` = NAP na transformatie), zodat filters, raster en plots hetzelfde blijven.
+
+**Workflow (hoog niveau):**
+
+```mermaid
+flowchart TD
+  main[main.py]
+  main --> branch{data_source}
+  branch -->|las| lasFlow[find_las chunk load_data]
+  branch -->|icesat| iceFlow[fetch_icesat_points_gdf]
+  lasFlow --> core[apply_filters generate_raster plot_map]
+  iceFlow --> core
+```
+
+**Credentials:** gebruik je **Earthdata-gebruikersnaam en -wachtwoord**. Kopieer [`.env.example`](.env.example) naar `.env` en zet `EARTHDATA_USERNAME` en `EARTHDATA_PASSWORD`. Registratie: [Earthdata Login](https://urs.earthdata.nasa.gov/).
+
+**Let op:** er worden **ATL03- én ATL08-granules** gedownload (zelfde bbox en tijdsvenster); methode komt uit [Pronk et al. (2024)](https://doi.org/10.3390/rs16132259) (koppeling `classed_pc_flag`).
+
+**Voorbeeld** (vanuit de projectmap, bijv. in `python` of een eigen script):
+
+```python
+from main import main
+
+main(
+      data_source="icesat",
+      icesat_temporal=("2025-01-01", "2025-12-31"),
+      icesat_bbox_lonlat=(4.7923, 52.4824, 5.0422, 52.6409), # Beemster
+      filter_geometries=True,
+      create_tif=True,
+      waterdelen_reference_date="2025-01-01",
+)
+```
+
+Een run leegt `data/output/` (en `.las` in `data/processed/`) op dezelfde manier als bij LAS-runs. De methodiek is overgenomen uit; Pronk, M.; Eleveld, M.; Ledoux, H. *Assessing Vertical Accuracy and Spatial Coverage of ICESat-2 and GEDI Spaceborne Lidar for Creating Global Terrain Models.* *Remote Sens.* **2024**, *16*, 2259. [https://doi.org/10.3390/rs16132259](https://doi.org/10.3390/rs16132259).
 
 ### Bestanden opsplitsen
 
@@ -104,6 +146,13 @@ heron/
 ├── logs/              # Log bestanden
 ├── tests/             # Pytest-tests (o.a. LAZ-fixture, src-modules)
 ├── src/               # Broncode
+│   ├── icesat2/       # ATL03/ATL08 download en HDF5 → GeoDataFrame
+│   │   ├── __init__.py
+│   │   ├── config.py
+│   │   ├── download.py
+│   │   ├── fetch.py
+│   │   ├── geodataframe.py
+│   │   └── hdf5_atl03.py
 │   ├── chunk_files.py
 │   ├── create_plots.py
 │   ├── filter_functions.py
@@ -120,6 +169,20 @@ heron/
 
 ### src/import_data.py
 - `load_data(lasfile, data_dir)`: Laadt en verwerkt .las/.laz bestanden
+- `get_waterdelen_for_points_gdf(points, crs, reference_date)`: PDOK waterdelen voor de extent van een punten-GeoDataFrame
+
+### src/icesat2/
+
+- **`Atl03Config`** (`config.py`): instellingen voor product (`ATL03`), versie (bv. `007`), beams, kandidaat-HDF5-veldnamen.
+- **`DEFAULT_ICESAT_BBOX_LONLAT`** (`config.py`): standaard WGS84-bbox `(lon_min, lat_min, lon_max, lat_max)` voor downloads (Noord-Holland).
+- **`fetch_icesat_points_gdf(...)`** (`fetch.py`): orkestreert download van **ATL03 én ATL08**, leest per granule grond-geclassificeerde photons, bouwt één punten-`GeoDataFrame`, haalt **waterdelen** op (zelfde aanpak als `load_data`), retourneert `(points_gdf, waterdelen_gdf, x_array)` waarbij `x_array` de X-kolom als numpy is (LAS-compatibel).
+- **`photon_recarray_to_points_gdf(...)`** (`geodataframe.py`): zet de structured numpy-array uit de HDF5-lezer om naar kolommen `X`, `Y`, `Z` (RD + NAP-hoogte), plus `delta_time` en `beam`, met geometrie en CRS RD New.
+
+Onderliggende helpers (voor uitbreiding of tests):
+
+- **`download_granules(...)`** (`download.py`): `earthaccess.login` + zoeken en downloaden van granules naar een cache-map; retourneert gedownloade paden.
+- **`list_hdf5_paths(...)`** (`download.py`): filtert een padlijst op `.h5` / `.hdf5` / `.hdf`.
+- **`read_atl03_points_from_hdf5(...)`** (`hdf5_atl03.py`): leest één ATL03-granule; koppelt via ATL08 `classed_pc_flag` / segmentindex aan grondphotons; transformeert WGS84-ellipsoïdaal naar RD+NAP (`EPSG:4979` → `EPSG:7415`, met 2D-fallback). Intern o.a. grondmasker uit ATL08 en beam-lus over `heights`.
 
 ### src/filter_spatial.py
 - `filter_spatial(points, waterdelen)`: Filtert punten binnen waterlichamen
@@ -179,6 +242,7 @@ Zie `requirements.txt` voor vaste versies. Kernpakketten:
 - rioxarray
 - contextily
 - matplotlib
+- earthaccess, h5py, python-dotenv (ICESat-2 download en `.env`)
 - pytest (tests draaien)
 
 ## Bijdragen
