@@ -1,12 +1,14 @@
+# Python >=3.10 required (geopandas 1.1.x, pyogrio 0.12.x).
 # This file may be used to create an environment using:
-numpy==1.26.0
-pandas==2.0.3
-geopandas==1.0.1
-fiona==1.9.1 
+numpy==1.26.4
+pandas==2.2.3
+shapely==2.0.7
+pyogrio==0.12.1
+fiona==1.10.1
+geopandas==1.1.3
 laspy==2.4.1
 lazrs==0.5.2
 xarray==2023.9.0
 rioxarray==0.15.0
 contextily==1.4.0
 matplotlib==3.7.2
-shapely==2.0.1

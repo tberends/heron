@@ -1,6 +1,6 @@
 ![banner](docs/images/heron.jpg)
 
-[![Python](https://img.shields.io/badge/Python-3.9%2B-blue)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
 [![Last Commit](https://img.shields.io/github/last-commit/tberends/heron)](https://github.com/tberends/heron/commits/master)
 [![Issues](https://img.shields.io/github/issues/tberends/heron)](https://github.com/tberends/heron/issues)
@@ -43,7 +43,8 @@ Het script biedt de volgende functionaliteit:
 ## 🛠️ Installatie
 
 1. Clone de repository
-2. Installeer de vereiste packages:
+2. Zorg voor **Python 3.10 of nieuwer** (vereist door o.a. GeoPandas 1.1.x).
+3. Installeer de vereiste packages:
 ```bash
 pip install -r requirements.txt
 ```
@@ -91,6 +92,7 @@ De bestanden worden opgesplitst op basis van ruimtelijke grenzen en krijgen een 
 
 ```
 heron/
+├── docs/              # o.a. projectrapport en README-afbeeldingen
 ├── data/
 │   ├── raw/           # Input .las/.laz bestanden
 │   ├── processed/     # Verwerkte bestanden
@@ -103,8 +105,7 @@ heron/
 │   ├── filter_spatial.py
 │   ├── generate_raster.py
 │   ├── get_waterdelen.py
-│   ├── import_data.py
-│   └── plot_frequency.py
+│   └── import_data.py
 └── main.py           # Hoofdscript
 ```
 
@@ -157,14 +158,17 @@ Alle verwerkingsstappen worden gelogd met:
 
 ## 📦 Afhankelijkheden
 
+Zie `requirements.txt` voor vaste versies. Kernpakketten:
+
 - numpy
 - pandas
-- geopandas
+- shapely
+- pyogrio (vector-I/O voor GeoPandas)
 - fiona
+- geopandas
 - laspy
 - lazrs
 - xarray
 - rioxarray
 - contextily
 - matplotlib
-- shapely
